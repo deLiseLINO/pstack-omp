@@ -169,6 +169,11 @@ runtime_contract() {
 	adopt skills/reflect/SKILL.md '"required":["Accepted","Rejected","Backlog"]' 'the synthesizer output schema'
 	adopt skills/poteto-mode/playbooks/shipping.md 'pr://<n>/diff/all' 'the github device read surface'
 	adopt skills/poteto-mode/playbooks/shipping.md 'github.enabled' 'the github tool availability gate'
+	# The device adoption is only real where the playbooks that read PRs actually use it.
+	# Shipping alone left the claim half-true, because babysit is the playbook that reads
+	# review threads most.
+	adopt skills/poteto-mode/playbooks/babysit.md 'pr://<n>' 'the github device read surface'
+	adopt skills/poteto-mode/playbooks/babysit.md 'Keep every *write* on the resolved forge' 'a single writer per mutation'
 	# A pr:// selector no doc names is the same class of error as the hub fiction this gate
 	# already bans, so pin the documented forms and refuse the invented cross-repo one.
 	if grep -rqE 'pr://<[a-z-]+>/<[a-z-]+>/<n>' "${SCOPE[@]}" 2>/dev/null; then

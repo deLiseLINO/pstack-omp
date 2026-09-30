@@ -159,6 +159,12 @@ mutate_veto_provenance() {
 
 expect_failure 'external veto provenance' 'external capability provenance' mutate_veto_provenance
 
+mutate_babysit_device() {
+	sed -i '/^   Reading a thread is a separate surface/d' "$FIXTURE/skills/poteto-mode/playbooks/babysit.md"
+}
+
+expect_failure 'babysit device read surface' 'capability wiring' mutate_babysit_device
+
 if [ "$fail" -ne 0 ]; then
 	printf 'mutation tests: FAIL\n'
 	exit 1
