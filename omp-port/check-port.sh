@@ -163,11 +163,21 @@ runtime_contract() {
 		grep -qF "$needle" "$f" || bad="$bad$f lacks $what"$'\n'
 	}
 	adopt skills/arena/SKILL.md 'Pass this explicit `outputSchema`' 'a typed cross-judge result'
-	adopt skills/arena/SKILL.md 'agent://<judge-id>/scores' 'a typed read of the judge verdict'
+	adopt skills/arena/SKILL.md 'parsed `data` you index into' 'a typed read of the judge verdict'
 	adopt skills/interrogate/SKILL.md 'an explicit `outputSchema` when the live task schema exposes one' 'a typed reviewer finding'
-	adopt skills/interrogate/SKILL.md 'agent://<reviewer-id>/findings' 'a typed read of reviewer findings'
+	adopt skills/interrogate/SKILL.md 'parsed `data` you index into' 'a typed read of reviewer findings'
 	adopt skills/reflect/SKILL.md '"required":["Accepted","Rejected","Backlog"]' 'the synthesizer output schema'
 	adopt skills/poteto-mode/playbooks/shipping.md 'pr://<n>/diff/all' 'the github device read surface'
+	adopt skills/poteto-mode/playbooks/shipping.md 'github.enabled' 'the github tool availability gate'
+	# A pr:// selector no doc names is the same class of error as the hub fiction this gate
+	# already bans, so pin the documented forms and refuse the invented cross-repo one.
+	if grep -rqE 'pr://<[a-z-]+>/<[a-z-]+>/<n>' "${SCOPE[@]}" 2>/dev/null; then
+		bad="$bad"'an undocumented pr://<owner>/<repo>/<n> selector'$'\n'
+	fi
+	# Same for a slash selector on agent://, whose only documented example is a nested path.
+	if grep -rqE 'agent://<[a-z-]+>/[a-z-]+>?' "${SCOPE[@]}" 2>/dev/null; then
+		bad="$bad"'an unverified agent://<id>/<key> selector'$'\n'
+	fi
 	adopt skills/poteto-mode/playbooks/autopilot-stack.md 'proc://<name>/kill' 'the named proc watcher lifecycle'
 	adopt skills/poteto-mode/playbooks/orchestrate.md "the pool's name is its job id" 'a pool for the refilling window'
 	adopt skills/poteto-mode/playbooks/orchestrate.md 'open a todo list with one entry per phase' 'root plan tracking'

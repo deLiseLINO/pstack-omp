@@ -60,7 +60,7 @@ The same filled template goes to all reviewers, so every model applies the code-
 {"type":"object","required":["findings"],"properties":{"findings":{"type":"array","items":{"type":"object","required":["description","severity","file"],"properties":{"description":{"type":"string"},"severity":{"type":"string"},"file":{"type":"string"},"line":{"type":"string"},"why_it_matters":{"type":"string"}}}}}}
 ```
 
-Read each reviewer's records at `agent://<reviewer-id>/findings`. A validation error on a result is a fact about that reviewer, and a reviewer whose findings never validate has not reported.
+Take the records from each spawn's structured result, whose parsed `data` you index into, rather than parsing the report. The full artifact is at `agent://<reviewer-id>`; a slash path on it is JSON extraction whose exact grammar varies, so prefer the structured result and read the artifact when you need the prose. A validation error on a result is a fact about that reviewer, and a reviewer whose findings never validate has not reported.
 
 ## Step 4, Synthesize
 

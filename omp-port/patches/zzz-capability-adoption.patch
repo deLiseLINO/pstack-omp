@@ -1,18 +1,16 @@
-diff --git a/skills/arena/SKILL.md b/skills/arena/SKILL.md
-index 1f5e1b8..c22843f 100644
 --- a/skills/arena/SKILL.md
 +++ b/skills/arena/SKILL.md
-@@ -40,11 +40,19 @@ If a candidate fails to produce output, proceed with N-1 and note the dropout in
+@@ -40,11 +40,19 @@
  
  After all Phase B candidates complete, choose an exact discovered judge agent. Start the judge in one `task` call with one item in `tasks[]`, the required shared `context`, and that exact agent name. Its frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field. The brief carries read-only posture, grants only the tools that discovered agent actually has, forbids writes, and has no task `readonly` field. Prefer a different configured model family when the operator's model policy and roster supply one; otherwise keep the exact agent and report weaker model diversity. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Don't spawn the judge while candidates are still writing.
  
-+Pass this explicit `outputSchema` so the scores arrive typed instead of scraped from prose. It takes precedence over the agent's own frontmatter output and over the inherited session schema, and the result carries the validation status with it. When the live task schema does not expose `outputSchema`, ask for the same shape in the brief and keep reading the free-text report.
++Pass this explicit `outputSchema` so the scores arrive typed instead of scraped from prose. It takes precedence over the agent's own frontmatter output and over the inherited session schema, and the result carries the validation status and any validation error. Shape it around the criteria Phase A actually produced rather than fixed field names, because the rubric is derived at runtime. When the live task schema does not expose `outputSchema`, ask for the same shape in the brief and keep reading the free-text report.
 +
 +```json
 +{"type":"object","required":["scores","recommendedBase","rationale"],"properties":{"scores":{"type":"array","items":{"type":"object","required":["label","criterion","score","evidence"],"properties":{"label":{"type":"string"},"criterion":{"type":"string"},"score":{"type":"number"},"evidence":{"type":"string"}}}},"recommendedBase":{"type":"string"},"rationale":{"type":"string"}}}
 +```
 +
-+Read the parsed result at `agent://<judge-id>/scores` and `agent://<judge-id>/rationale` rather than parsing the report yourself. A validation error on the result means the judge's own output was malformed, which is a fact about the judge worth recording next to the verdict.
++Take the verdict from the spawn's own structured result, whose parsed `data` you index into, rather than parsing the report yourself. The full artifact is at `agent://<judge-id>`, and a slash path on it is JSON extraction whose exact grammar varies, so prefer the structured result and read the artifact only when you need the prose. A validation error on the result means the judge's own output was malformed, which is a fact about the judge worth recording next to the verdict.
 +
  ## Phase D: Pick a base
  
@@ -23,11 +21,9 @@ index 1f5e1b8..c22843f 100644
  
  Pick the base on which candidate a future maintainer can extend most easily without breaking invariants. Prefer the cleaner boundary or smaller API when two feel tied, per the Laziness Protocol.
  
-diff --git a/skills/interrogate/SKILL.md b/skills/interrogate/SKILL.md
-index 291d31d..139fe64 100644
 --- a/skills/interrogate/SKILL.md
 +++ b/skills/interrogate/SKILL.md
-@@ -44,6 +44,7 @@ Launch all reviewers in one `task` call with the required shared `context` and a
+@@ -44,6 +44,7 @@
  For each reviewer:
  - `agent`: an exact discovered reviewer agent name. Its frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field
  - read-only posture. The brief grants only the tools the discovered agent actually has and forbids writes
@@ -35,7 +31,7 @@ index 291d31d..139fe64 100644
  
  If the requested exact reviewer is absent, use another discovered reviewer with the same brief and report the missing model diversity. A model override cannot create an agent.
  
-@@ -55,12 +56,18 @@ Read `references/reviewer-prompt.md` and fill in the template with:
+@@ -55,12 +56,18 @@
  
  The same filled template goes to all reviewers, so every model applies the code-quality lens.
  
@@ -43,7 +39,7 @@ index 291d31d..139fe64 100644
 +{"type":"object","required":["findings"],"properties":{"findings":{"type":"array","items":{"type":"object","required":["description","severity","file"],"properties":{"description":{"type":"string"},"severity":{"type":"string"},"file":{"type":"string"},"line":{"type":"string"},"why_it_matters":{"type":"string"}}}}}}
 +```
 +
-+Read each reviewer's records at `agent://<reviewer-id>/findings`. A validation error on a result is a fact about that reviewer, and a reviewer whose findings never validate has not reported.
++Take the records from each spawn's structured result, whose parsed `data` you index into, rather than parsing the report. The full artifact is at `agent://<reviewer-id>`; a slash path on it is JSON extraction whose exact grammar varies, so prefer the structured result and read the artifact when you need the prose. A validation error on a result is a fact about that reviewer, and a reviewer whose findings never validate has not reported.
 +
  ## Step 4, Synthesize
  
@@ -56,8 +52,6 @@ index 291d31d..139fe64 100644
  3. **Identify lone-model findings**. Still worth reading, but weight accordingly.
  4. **Deduplicate**. Different models may describe the same issue differently. Merge these and note which models raised it.
  5. **Note disagreements**. If one model flags something and another explicitly says the opposite, that's useful context for the verdict.
-diff --git a/skills/poteto-mode/playbooks/autopilot-stack.md b/skills/poteto-mode/playbooks/autopilot-stack.md
-index 130fd3f..5b2bba4 100644
 --- a/skills/poteto-mode/playbooks/autopilot-stack.md
 +++ b/skills/poteto-mode/playbooks/autopilot-stack.md
 @@ -4,6 +4,8 @@
@@ -69,11 +63,9 @@ index 130fd3f..5b2bba4 100644
  3. **Hold the operator gates.** State-then-wait, so a request to state the plan is not a go. On the operator's explicit go, arm a `/goal` with the full program objective. Use `/goal` only if exposed and enabled; otherwise retain the predicate in the durable plan. Do not change global configuration. The goal continues across turns until the chain is done. On the operator's stop, every owner takes an immediate zero-writes hold.
  4. **Verify each round.** The owner reports its code-ready head SHA once the shipped code is final, and STACK-READY with the exact head SHA when its loop is green. The root verifies each round per Autopilot-full step 4, with STACK-READY in place of merge-ready. Nothing enters the stack unverified.
  5. **Append on a clean verdict, never ship.** No owner merges, arms auto-merge, or closes. A clean verdict appends the PR to the one linear base-branch stack, in verified order or an order the operator specified.
-diff --git a/skills/poteto-mode/playbooks/orchestrate.md b/skills/poteto-mode/playbooks/orchestrate.md
-index d6e0592..29752f5 100644
 --- a/skills/poteto-mode/playbooks/orchestrate.md
 +++ b/skills/poteto-mode/playbooks/orchestrate.md
-@@ -62,9 +62,11 @@ A dependency is a context relay, not just ordering: undeclared upstream context
+@@ -62,9 +62,11 @@
  #### Steps
  
  1. **Frame.** State the done predicate as something countable ("all 126 units merged, each ledger-verified `unit-test-verified` or better"). Quantify scope: units, rough effort, expected stacks, and the wall-clock budget. If one agent could finish inside that budget, stop here and run Autonomous run instead. Collapsing must not depend on another document being present: it means do the work directly in this session, plain workers where they help, verification inline, landing as you go, and none of the store, register, or pilot machinery below. Schedule landing against the budget: by roughly 70% of it, stop starting new work and land what is verified, because finished-but-unlanded work counts as zero. Name the tracks per project. A contested decomposition or one-way door goes through the arena skill before the pilot. Present the framing once; reversible prep proceeds without waiting.
@@ -86,8 +78,6 @@ index d6e0592..29752f5 100644
  5. **Drain.** Run the queue discipline below at every drain point.
  6. **Land.** Landing is continuous, never a terminal phase: integration starts with the first verified unit and runs alongside the remaining waves. On heavy repos the stacker is a standing role from wave one, integrating as units verify; on repos where local git is cheap, the coordinator lands verified units itself per Roles. Keep the frontier green before upper-stack work; Stack safety governs. Advance `frontier.json` only on merge or reported new head SHAs.
  7. **Close.** Drain the final inbox, reconcile every started session to a terminal row (done, abandoned, zombie-reconciled), confirm the predicate on the real artifact, confirm every landed PR has a verdict for its current head SHA, audit the trail per show-me-your-work including its independent reviewer pass, encode recurring corrections into `preferences.md` or the brief template. Leave the store intact; it is the postmortem.
-diff --git a/skills/poteto-mode/playbooks/pause-safely.md b/skills/poteto-mode/playbooks/pause-safely.md
-index 7cde36b..6f57ec0 100644
 --- a/skills/poteto-mode/playbooks/pause-safely.md
 +++ b/skills/poteto-mode/playbooks/pause-safely.md
 @@ -7,4 +7,6 @@
@@ -97,8 +87,6 @@ index 7cde36b..6f57ec0 100644
 +   The note is a cold-start handoff, so keep it even when `checkpoint` is enabled. Checkpoint collapses *conversation* context into a report you write; despite what its device summary says it calls no git operation and takes no working-tree snapshot, no artifact copy, and no filesystem state at all. Use `checkpoint` with a goal when the pause is a context collapse inside this session and you would rather collapse the exploration than carry it, then `rewind` with the findings before yielding. It is gated behind `checkpoint.enabled`, off by default, and only one may be active at a time. Neither replaces the note, because a cold-start agent reads files and not this session's transcript.
 +
  **Reply:** where you are in the loop, what's on disk versus still in your head (paths, no diff dumps), the commits you made and whether the tree is clean, and the first action on resume. This is a pause, not a final report.
-diff --git a/skills/poteto-mode/playbooks/shipping.md b/skills/poteto-mode/playbooks/shipping.md
-index 9c58d07..66f4157 100644
 --- a/skills/poteto-mode/playbooks/shipping.md
 +++ b/skills/poteto-mode/playbooks/shipping.md
 @@ -5,7 +5,9 @@
@@ -107,13 +95,11 @@ index 9c58d07..66f4157 100644
  1. **Resolve the forge, then verify every PR independently.** GitHub CLI (`gh`) is the default. If `command -v origin` succeeds and Origin can resolve the repository, use `origin pr ...` for PR view, watch, edit, and merge operations. Otherwise stay on `gh` and record the fallback. Never require Graphite (`gt`). Start all PR verifiers in one `task` call with all items in `tasks[]` and the required shared `context`; each item uses an exact discovered reviewer agent, or omits `agent` for the default worker with the reviewer role, and requests an isolated subagent. Each verifier exercises the real surface with the matching control skill (such as the `browser` eval prelude or bash with a unique async `name`, `ready` checks, and `proc://` state from omp's built-in tools) against parent versus head. Each returns `PASS`, `PASS+NOTES` or `FAIL` and posts that verdict on its own PR. Safe means a verdict from an agent that did not write the code. CI green is not a verdict, and an approving bot review is not a verdict.
 -2. **Land only the contiguous verified run rooted at the bottom.** Walk up from the lowest unmerged PR and stop at the first one without a passing verdict, where both `PASS` and `PASS+NOTES` pass. A verified PR sitting above an unverified one is not landable. Report the ceiling as a PR number and say what breaks the chain.
 +
-+The built-in GitHub device is the better default when it is exposed, and it is a read surface rather than a second forge. `read pr://<owner>/<repo>/<n>` gives the PR, `pr://<n>/diff` the changed files, `pr://<n>/diff/all` the full patch, and `issue://<n>` an issue or a PR's body and comments. Read the device docs before the first call in a session rather than assuming a shape. Use it to *read* review threads, check state, and diffs; keep the forge client for writes, so there is still exactly one writer per external mutation. Reach for `gh` when the device is absent or the repository is not GitHub, and record which surface answered.
++GitHub has a built-in read surface, and it is a reader rather than a second forge. Single PR and issue reads are URL schemes resolved by the `read` tool, not by a forge client: `pr://<n>` for one PR, `pr://<n>/diff` for its changed files, `pr://<n>/diff/<i>` for one file's slice, `pr://<n>/diff/all` for the full unified diff, and `issue://<n>` for an issue or a PR's body, comments, and reviews. `pr://owner/repo` is a listing across a repository, not a way to name one PR. A separate `github` tool covers repository and file reads, search, PR create, PR checkout, PR push, and Actions run watching; it is gated behind `github.enabled`, which is off by default, and it exists only when `gh` is on `PATH`. Read each surface's doc before the first call in a session rather than assuming a shape. Use them to *read* review threads, check state, and diffs, and keep the forge client for writes, so there is still exactly one writer per external mutation and the Origin path keeps working unchanged. Reach for the forge client when a surface is absent, gated off, or the repository is not GitHub, and record which surface answered.
 +2. **Land only the contiguous verified run rooted at the bottom.** Walk up from the lowest unmerged PR and stop at the first one without a passing verdict, where both `PASS` and `PASS+NOTES` pass. A verified PR sitting above an unverified one is not landable. Report the ceiling as a PR number and say what breaks the chain. Read the queue through the device where it is exposed rather than through a JSON dump, so a reviewer thread you have not read is visible as a thread.
  3. **Re-check that each verdict still describes the patch.** Record the verdict head SHA, base SHA, and stable `git patch-id` of that PR's base-to-head diff. A rebase or base retarget rewrites SHAs and can silently invalidate a verdict without touching a check. Before landing a PR, compare the recorded patch-id with its current base-to-head patch-id. When the two patches differ only in tests, docs, or lint config, build what each lane ran. Build it twice at the verdict SHA and once at the current head. A difference is noise if the two builds at the verdict SHA also show it, or if it is an embedded commit SHA. Judge each difference, not each file, and report each kind of noise with its files. If only noise differs, that lane's result stays valid, and checks and a review of the change run fresh. Do not reuse a lane result from a dev server or from anything else with no build output. Rerun that lane. Re-verify anything else when the patch changed. When it did not, keep the code verdict but re-run mergeability and CI at the current head. Never use matching commit messages or a green check from an older SHA as a substitute.
  4. **Prepare only the bottom PR.** Fetch current trunk. Rebase the lowest verified branch onto the exact trunk tip when needed, push it, and retarget only that PR to trunk with `origin pr edit <pr> --base <trunk>` or `gh pr edit <pr> --base <trunk>`. Re-run step 3 after the push. Do not retarget, arm, or merge descendants yet.
  5. **Land one PR at a time.** If the bottom PR is mergeable now, squash it with `origin pr merge <pr> --squash` or `gh pr merge <pr> --squash`. If requirements are still running and the user asked for merge-when-ready, arm only that PR with `origin pr merge <pr> --squash --auto` or `gh pr merge <pr> --squash --auto`. Origin's `--auto` is Origin merge-when-ready. GitHub's `--auto` is GitHub auto-merge. Wait for that PR to merge before preparing the next one.
-diff --git a/skills/poteto-mode/references/bugbot-triage.md b/skills/poteto-mode/references/bugbot-triage.md
-index 1d65baf..f44641f 100644
 --- a/skills/poteto-mode/references/bugbot-triage.md
 +++ b/skills/poteto-mode/references/bugbot-triage.md
 @@ -2,6 +2,8 @@
