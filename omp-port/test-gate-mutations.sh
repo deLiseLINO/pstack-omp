@@ -153,6 +153,12 @@ mutate_checkpoint_claim() {
 expect_failure 'typed verdict' 'capability wiring' mutate_typed_verdict
 expect_failure 'checkpoint filesystem claim' 'capability wiring' mutate_checkpoint_claim
 
+mutate_veto_provenance() {
+	sed -i 's/ships no `session_stop` veto/ships a session_stop veto/' "$FIXTURE/README.md"
+}
+
+expect_failure 'external veto provenance' 'external capability provenance' mutate_veto_provenance
+
 if [ "$fail" -ne 0 ]; then
 	printf 'mutation tests: FAIL\n'
 	exit 1
