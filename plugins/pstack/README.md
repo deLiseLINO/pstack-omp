@@ -51,7 +51,7 @@ model. Name a capability, bind it once in `modelRoles`, pick the chat model with
 
 Judged roles return a typed result, not prose: `arena`'s cross-judge, `interrogate`'s reviewers,
 and `reflect`'s synthesizer each pass an explicit `outputSchema`, and the verdict is read from the
-spawn's structured result. GitHub PRs and issues are read through the built-in URL schemes
+spawn's structured result. In `shipping` and `babysit`, GitHub PRs and issues are read through the built-in URL schemes
 (`pr://<n>`, `pr://<n>/diff`, `issue://<n>`) while the forge client stays the only writer. A
 refilling fan-out uses a work pool rather than a fixed batch. `checkpoint` is used only for what it
 does, which is collapsing conversation context.
