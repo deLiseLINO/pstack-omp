@@ -153,6 +153,37 @@ runtime_contract() {
 	else
 		report "install root" "PASS  every install path resolves under ~/.omp"
 	fi
+
+	# Harness capabilities the port names but does not wire. Each of these was described in the
+	# adapter and unreachable from the playbook that needs it, which is the failure this block
+	# exists to make impossible: prose that documents a capability nothing routes to.
+	bad=""
+	adopt() {
+		local f=$1 needle=$2 what=$3
+		grep -qF "$needle" "$f" || bad="$bad$f lacks $what"$'\n'
+	}
+	adopt skills/arena/SKILL.md 'Pass this explicit `outputSchema`' 'a typed cross-judge result'
+	adopt skills/arena/SKILL.md 'agent://<judge-id>/scores' 'a typed read of the judge verdict'
+	adopt skills/interrogate/SKILL.md 'an explicit `outputSchema` when the live task schema exposes one' 'a typed reviewer finding'
+	adopt skills/interrogate/SKILL.md 'agent://<reviewer-id>/findings' 'a typed read of reviewer findings'
+	adopt skills/reflect/SKILL.md '"required":["Accepted","Rejected","Backlog"]' 'the synthesizer output schema'
+	adopt skills/poteto-mode/playbooks/shipping.md 'pr://<n>/diff/all' 'the github device read surface'
+	adopt skills/poteto-mode/playbooks/autopilot-stack.md 'proc://<name>/kill' 'the named proc watcher lifecycle'
+	adopt skills/poteto-mode/playbooks/orchestrate.md "the pool's name is its job id" 'a pool for the refilling window'
+	adopt skills/poteto-mode/playbooks/orchestrate.md 'open a todo list with one entry per phase' 'root plan tracking'
+	adopt skills/poteto-mode/references/bugbot-triage.md 'exact discovered `security-reviewer`' 'the native security lane'
+	adopt skills/poteto-mode/playbooks/pause-safely.md 'collapses *conversation* context' 'checkpoint scoped to what it does'
+	# The device summary calls checkpoint git-based and filesystem-saving. It is neither, and a
+	# playbook that repeats that claim sends a cold-start handoff through the wrong primitive.
+	if grep -qiE 'git-based checkpoint|checkpoint (snapshots|saves) (the |your )?(working tree|filesystem|files|repo|repository)' skills/poteto-mode/playbooks/pause-safely.md; then
+		bad="$bad"'skills/poteto-mode/playbooks/pause-safely.md claims checkpoint snapshots the filesystem'$'\n'
+	fi
+	if [ -n "$bad" ]; then
+		report "capability wiring" "FAIL"
+		while read -r line; do [ -n "$line" ] && violate "$line"; done <<<"$bad"
+	else
+		report "capability wiring" "PASS  typed verdicts, github reads, named proc, pool, root plan, native security lane"
+	fi
 	bad=""
 	for f in skills/poteto-mode/playbooks/autopilot-full.md skills/poteto-mode/playbooks/autopilot-stack.md; do
 		grep -qF 'exact discovered owner agent' "$f" && grep -qF 'default worker with the owner role' "$f" || bad="$bad$f lacks exact owner fallback"$'\n'
