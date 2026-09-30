@@ -141,13 +141,39 @@ runtime_contract() {
 
 	bad=""
 	for f in skills/arena/SKILL.md skills/swarm/SKILL.md skills/reflect/SKILL.md skills/interrogate/SKILL.md; do
-		grep -q 'tasks\[\]' "$f" && ! grep -q 'required shared `context`' "$f" && bad="$bad$f lacks required shared context"$'\n'
+		grep -q 'tasks\[\]' "$f" && grep -q 'required shared `context`' "$f" || bad="$bad$f lacks the tasks[] batch shape or its required shared context"$'\n'
 	done
 	if [ -n "$bad" ]; then
 		report "runtime batch context" "FAIL"
 		while read -r line; do violate "$line"; done <<<"$bad"
 	else
 		report "runtime batch context" "PASS  arena, swarm, reflect, and interrogate name context"
+	fi
+
+	bad=""
+	contract=skills/pstack-omp/SKILL.md
+	for required in \
+		'solutionSpace' \
+		'kernel-defined' \
+		'eval.tools.enabled' \
+		'names the yield tool' \
+		'`error` for a failure' \
+		'three reminder prompts' \
+		'task.isolation.enabled' \
+		'task.enableEffort' \
+		'task.batch' \
+		'task.maxRecursionDepth' \
+		'task.softRequestBudget' \
+		'task.maxRuntimeMs' \
+		'task.maxConcurrency' \
+		'task.agentIdleTtlMs'; do
+		grep -qF "$required" "$contract" || bad="$bad"'pstack-omp runtime contract lacks '"$required"$'\n'
+	done
+	if [ -n "$bad" ]; then
+		report "runtime contract fields" "FAIL"
+		while read -r line; do [ -n "$line" ] && violate "$line"; done <<<"$bad"
+	else
+		report "runtime contract fields" "PASS  required item fields, the yield call, and the gating settings are named"
 	fi
 
 	bad=$(grep -riEn '(start|spawn|launch|run|use|gets?) (one|a single) [^.]*(subagent|worker|judge|synthesizer|explainer|investigator|reviewer|owner|watcher|comment review)|(^|[.!?] )one [^.]{0,40}subagent per |gets? (a|an) (owner|watcher) subagent|one item in `tasks\[\]`' --include='*.md' "${SCOPE[@]}" 2>/dev/null | grep -vE '^skills/(pstack-omp|omp-mechanics)/' | awk '{ s = tolower($0); if (s ~ /all items in `tasks\[\]`/ || s ~ /one item per [^.]* in `tasks\[\]`/) next; if (s !~ /one `task` call with one item in `tasks\[\]`,? (and |)(one|the) required shared `context`/) print }' || true)

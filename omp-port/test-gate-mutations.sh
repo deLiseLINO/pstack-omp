@@ -70,6 +70,30 @@ mutate_router_lever() {
 	sed -i 's/task\.agentModelOverrides/task.model/g' "$FIXTURE/skills/poteto-mode/SKILL.md"
 }
 
+mutate_batch_shape_abandoned() {
+	sed -i 's/tasks\[\]/items[]/g; s/the required shared `context`/the shared brief/g' "$FIXTURE/skills/arena/SKILL.md"
+}
+
+mutate_yield_line_dropped() {
+	sed -i '/^\*\*Yield first\.\*\*/d' "$FIXTURE/skills/pstack-omp/SKILL.md"
+}
+
+mutate_yield_account_dropped() {
+	sed -i 's/A child that ends without the call costs three reminder prompts, then a system warning and no structured output\. //' "$FIXTURE/skills/pstack-omp/SKILL.md"
+}
+
+mutate_required_item_field() {
+	sed -i 's/solutionSpace/spaceField/g' "$FIXTURE/skills/pstack-omp/SKILL.md"
+}
+
+mutate_gate_setting_dropped() {
+	sed -i 's/task\.softRequestBudget/task.softBudget/g' "$FIXTURE/skills/pstack-omp/SKILL.md"
+}
+
+mutate_tool_class_renamed() {
+	sed -i 's/kernel-defined/eval-defined/g' "$FIXTURE/skills/pstack-omp/SKILL.md"
+}
+
 expect_failure 'unrelated ownership' 'setup config contract' mutate_preserve_ownership
 expect_failure 'per-agent ownership' 'setup config contract' mutate_override_ownership
 expect_failure 'alias shape' 'setup config contract' mutate_alias_shape
@@ -77,6 +101,12 @@ expect_failure 'supported suffix list' 'setup config contract' mutate_supported_
 expect_failure 'base selector validation' 'setup config contract' mutate_base_selector
 expect_failure 'setup model lever' 'omp model levers' mutate_setup_lever
 expect_failure 'router model lever' 'omp model levers' mutate_router_lever
+expect_failure 'batch shape abandoned' 'runtime batch context' mutate_batch_shape_abandoned
+expect_failure 'yield line dropped' 'runtime contract fields' mutate_yield_line_dropped
+expect_failure 'yield account dropped' 'runtime contract fields' mutate_yield_account_dropped
+expect_failure 'required item field' 'runtime contract fields' mutate_required_item_field
+expect_failure 'gate setting dropped' 'runtime contract fields' mutate_gate_setting_dropped
+expect_failure 'tool class renamed' 'runtime contract fields' mutate_tool_class_renamed
 
 if [ "$fail" -ne 0 ]; then
 	printf 'mutation tests: FAIL\n'
