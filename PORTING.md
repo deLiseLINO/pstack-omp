@@ -194,8 +194,8 @@ The injected reminder is a pointer, not the playbook. It tells the agent to read
 - **`swarm` / `arena` / `interrogate`.** One `task` call with a `tasks[]` batch,
   `task.maxConcurrency=100`, `isolated: true` per candidate, `outputSchema` for judged verdicts.
 - **Never-block.** Subagents run `approvalMode: yolo`, so a worker cannot stop to ask. The backstop
-  is *not* something this plugin ships. pstack registers six extension surfaces, none of them
-  `session_stop`, so nothing here vetoes a malformed subagent result. What pstack relies on is the
+  is *not* something this plugin ships. The one extension here is the mode pin, and it registers no
+  `session_stop`, so nothing vetoes a malformed subagent result. What pstack relies on is the
   root's own acceptance discipline: `skill://pstack-omp` requires the root to read each result and
   accept or reject it, and a `judge`/`verifier` role is the independent check on a worker's claim.
   A `session_stop` veto is available on this machine from `~/.omp/agent/extensions/proofgate/`, an
