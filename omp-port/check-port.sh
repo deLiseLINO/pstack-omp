@@ -180,7 +180,7 @@ runtime_contract() {
 		bad="$bad"'an undocumented pr://<owner>/<repo>/<n> selector'$'\n'
 	fi
 	adopt skills/poteto-mode/playbooks/autopilot-stack.md 'proc://<name>/kill' 'the named proc watcher lifecycle'
-	adopt skills/poteto-mode/playbooks/orchestrate.md "the pool's name is its job id" 'a pool for the refilling window'
+	adopt skills/poteto-mode/playbooks/orchestrate.md 'A refilling window is what a work pool is for' 'a pool for the refilling window'
 	adopt skills/poteto-mode/playbooks/orchestrate.md 'open a todo list with one entry per phase' 'root plan tracking'
 	adopt skills/poteto-mode/references/bugbot-triage.md 'exact discovered `security-reviewer`' 'the native security lane'
 	adopt skills/poteto-mode/playbooks/pause-safely.md 'collapses *conversation* context' 'checkpoint scoped to what it does'
