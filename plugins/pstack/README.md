@@ -41,6 +41,12 @@ observed through `read proc://`, or a systemd user timer. Cursor transcripts bec
 `~/.omp/agent/sessions/`, and worker output is read at `agent://<id>`. No skill names a vendor
 model. Name a capability, bind it once in `modelRoles`, pick the chat model with `/model`.
 
+Judged roles return a typed result, not prose: `arena`'s cross-judge, `interrogate`'s reviewers,
+and `reflect`'s synthesizer each pass an explicit `outputSchema`, read back at
+`agent://<id>/<key>`. GitHub state is read through the built-in device (`pr://`, `issue://`) while
+the forge client stays the only writer. A refilling fan-out uses a work pool rather than a fixed
+batch. `checkpoint` is used only for what it does, which is collapsing conversation context.
+
 `PORTING.md` at the repo root records every substitution and the re-sync procedure.
 
 ## Model for the agent

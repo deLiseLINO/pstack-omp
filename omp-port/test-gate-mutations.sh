@@ -142,6 +142,17 @@ expect_failure 'install root in the port docs' 'install root' mutate_install_roo
 expect_failure 'cursor tool name' 'cursor tool names' mutate_cursor_tool_name
 expect_failure 'bare skill command' 'skill command form' mutate_bare_skill_command
 
+mutate_typed_verdict() {
+	sed -i '/^Pass this explicit `outputSchema` so the scores arrive typed/d' "$FIXTURE/skills/arena/SKILL.md"
+}
+
+mutate_checkpoint_claim() {
+	printf '\nCheckpoint snapshots the working tree and filesystem before pausing.\n' >>"$FIXTURE/skills/poteto-mode/playbooks/pause-safely.md"
+}
+
+expect_failure 'typed verdict' 'capability wiring' mutate_typed_verdict
+expect_failure 'checkpoint filesystem claim' 'capability wiring' mutate_checkpoint_claim
+
 if [ "$fail" -ne 0 ]; then
 	printf 'mutation tests: FAIL\n'
 	exit 1
