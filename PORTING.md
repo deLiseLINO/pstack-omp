@@ -193,13 +193,16 @@ The injected reminder is a pointer, not the playbook. It tells the agent to read
   `wait-settle`.
 - **`swarm` / `arena` / `interrogate`.** One `task` call with a `tasks[]` batch,
   `task.maxConcurrency=100`, `isolated: true` per candidate, `outputSchema` for judged verdicts.
-- **Never-block.** Subagents run `approvalMode: yolo`, so a worker cannot stop to ask. The backstop
-  is *not* something this plugin ships. The one extension here is the mode pin, and it registers no
-  `session_stop`, so nothing vetoes a malformed subagent result. What pstack relies on is the
-  root's own acceptance discipline: `skill://pstack-omp` requires the root to read each result and
-  accept or reject it, and a `judge`/`verifier` role is the independent check on a worker's claim.
-  A `session_stop` veto is available on this machine from `~/.omp/agent/extensions/proofgate/`, an
-  extension this repository neither ships nor requires. Treat it as a local add-on.
+- **Never-block.** Subagents run `approvalMode: yolo`, so a worker cannot stop to ask. **Nothing
+  here vetoes a malformed subagent result.** The one extension this plugin ships is the mode pin,
+  and it registers no `session_stop`. What pstack relies on is the root's own acceptance discipline:
+  `skill://pstack-omp` requires the root to read each result and accept or reject it, and a
+  `judge`/`verifier` role is the independent check on a worker's claim. That is the whole backstop.
+  Returning `{"decision":"block"}` from `session_stop` is the one native veto contract, and
+  `~/.omp/agent/extensions/proofgate/` implements it, dormant unless `$OMP_PROOF_FILE` is set. On
+  this machine that variable is unset, so proofgate is inert and never-block is unguarded today.
+  Its own `VERDICT.md` prefers an external check over it and calls the case unmeasured, so treat it
+  as a local experiment rather than the answer. This repository neither ships nor requires it.
 - **Sibling coordination.** `write agent://<id>` steers or follows up with a running, idle, or parked
   worker, `agent://all` broadcasts to visible live peers, `read history://` lists registered agents
   with status and parent, and `read proc://` lists background jobs and project services. These are

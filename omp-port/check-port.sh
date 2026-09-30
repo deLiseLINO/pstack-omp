@@ -203,6 +203,9 @@ runtime_contract() {
 		unbacked="$unbacked"$'\n'
 	grep -q 'neither ships nor requires' "$porting" 2>/dev/null || unbacked="$unbacked"$'PORTING.md must name the external veto extension as unshipped'$'\n'
 	grep -q 'ships no `session_stop` veto' "$readme" 2>/dev/null || unbacked="$unbacked"$'plugins/pstack/README.md must disclose that no session_stop veto ships'$'\n'
+	# The external veto is inert unless its own env var is set, so naming it without that
+	# precondition is the same inaccuracy one level down.
+	grep -q 'OMP_PROOF_FILE' "$porting" 2>/dev/null || unbacked="$unbacked"$'PORTING.md must record that the external veto is dormant unless $OMP_PROOF_FILE is set'$'\n'
 	if grep -q 'session_stop' skills/poteto-mode/SKILL.md 2>/dev/null; then
 		unbacked="$unbacked"$'poteto-mode must not claim a session_stop veto it does not ship'$'\n'
 	fi
