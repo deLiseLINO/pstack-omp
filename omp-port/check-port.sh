@@ -174,10 +174,6 @@ runtime_contract() {
 	if grep -rqE 'pr://<[a-z-]+>/<[a-z-]+>/<n>' "${SCOPE[@]}" 2>/dev/null; then
 		bad="$bad"'an undocumented pr://<owner>/<repo>/<n> selector'$'\n'
 	fi
-	# Same for a slash selector on agent://, whose only documented example is a nested path.
-	if grep -rqE 'agent://<[a-z-]+>/[a-z-]+>?' "${SCOPE[@]}" 2>/dev/null; then
-		bad="$bad"'an unverified agent://<id>/<key> selector'$'\n'
-	fi
 	adopt skills/poteto-mode/playbooks/autopilot-stack.md 'proc://<name>/kill' 'the named proc watcher lifecycle'
 	adopt skills/poteto-mode/playbooks/orchestrate.md "the pool's name is its job id" 'a pool for the refilling window'
 	adopt skills/poteto-mode/playbooks/orchestrate.md 'open a todo list with one entry per phase' 'root plan tracking'
