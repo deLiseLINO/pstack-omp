@@ -190,6 +190,28 @@ runtime_contract() {
 	else
 		report "capability wiring" "PASS  typed verdicts, github reads, named proc, pool, root plan, native security lane"
 	fi
+	# A capability claim sourced from outside this repository needs its provenance on the same line,
+	# or a maintainer reads a local install as a guarantee the plugin ships. PORTING.md and the
+	# shipped README are the two places that claim; PORTING.md sits at the repo root, outside SCOPE.
+	# PORTING.md lives outside the plugin root, so no fixture can cover it and the mutation
+	# harness proves only the README half below. $PWD is the plugin root, which the harness
+	# points at the fixture.
+	porting="$PORT_DIR/../PORTING.md"
+	readme="README.md"
+	unbacked=$(grep -nE 'veto is the +enforced backstop' "$porting" 2>/dev/null || true)
+	[ -z "$unbacked" ] ||
+		unbacked="$unbacked"$'\n'
+	grep -q 'neither ships nor requires' "$porting" 2>/dev/null || unbacked="$unbacked"$'PORTING.md must name the external veto extension as unshipped'$'\n'
+	grep -q 'ships no `session_stop` veto' "$readme" 2>/dev/null || unbacked="$unbacked"$'plugins/pstack/README.md must disclose that no session_stop veto ships'$'\n'
+	if grep -q 'session_stop' skills/poteto-mode/SKILL.md 2>/dev/null; then
+		unbacked="$unbacked"$'poteto-mode must not claim a session_stop veto it does not ship'$'\n'
+	fi
+	if [ -n "$unbacked" ]; then
+		report "external capability provenance" "FAIL"
+		while read -r c; do [ -n "$c" ] && violate "$c"; done <<<"$unbacked"
+	else
+		report "external capability provenance" "PASS  the external veto is named and marked unshipped"
+	fi
 	bad=""
 	for f in skills/poteto-mode/playbooks/autopilot-full.md skills/poteto-mode/playbooks/autopilot-stack.md; do
 		grep -qF 'exact discovered owner agent' "$f" && grep -qF 'default worker with the owner role' "$f" || bad="$bad$f lacks exact owner fallback"$'\n'
@@ -411,6 +433,7 @@ if [ -n "$unclaimed" ]; then
 else
 	report "guide claims" "PASS  verification skill, Feature Map, swarm, pin"
 fi
+
 
 bad=""
 for d in skills/*/; do

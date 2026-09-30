@@ -33,6 +33,14 @@ Use these optional agents only when the live roster lists them; otherwise the ad
 
 Then `/poteto-mode on`, or `alt+shift+t`, or `omp -p --poteto '...'` for headless runs.
 
+## What this plugin does not enforce
+
+Subagents run with `approvalMode: yolo`, so a worker cannot stop to ask you a question. This plugin
+ships no `session_stop` veto, so nothing here rejects a malformed subagent result for you. The gate
+is the root's own: it reads each worker's result and accepts or rejects it, and a judged role runs as
+an independent session. If you want a hard veto on a turn that yields nothing usable, install one as
+a separate extension; do not expect this plugin to supply it.
+
 ## What differs from upstream
 
 Every Cursor mechanic is substituted for its omp equivalent. Cloud agents become
