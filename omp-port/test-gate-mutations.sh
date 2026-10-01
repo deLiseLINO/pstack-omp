@@ -165,6 +165,22 @@ mutate_babysit_device() {
 
 expect_failure 'babysit device read surface' 'capability wiring' mutate_babysit_device
 
+# The Babysit mode vocabulary. These two cover opposite halves of one assertion: the denial, which
+# is the explanation, and the absence of the invocation, which is the thing being prevented. A gate
+# that only pinned the denial would pass the moment upstream reintroduced a mode name as something
+# to run, and a gate that only banned the name would pass the moment the explanation was deleted and
+# left a reader with an unexplained change.
+mutate_babysit_mode_invocation() {
+	printf '\nRun `drive` to take it to merge-ready.\n' >>"$FIXTURE/skills/poteto-mode/playbooks/babysit.md"
+}
+
+mutate_babysit_mode_denial() {
+	sed -i 's/ name no command on this runtime:/ ran nothing here:/' "$FIXTURE/skills/poteto-mode/playbooks/babysit.md"
+}
+
+expect_failure 'babysit Cursor mode invoked' 'capability wiring' mutate_babysit_mode_invocation
+expect_failure 'babysit mode denial removed' 'capability wiring' mutate_babysit_mode_denial
+
 # The upstream probes answer a question about omp-port/rules.sed, not about the generated tree, so
 # the fixture harness above cannot reach them: it mutates plugins/pstack and runs the gate with
 # CHECK_PORT_CONTRACTS_ONLY, which exits long before any upstream text is read. These two run the
