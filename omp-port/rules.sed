@@ -176,7 +176,24 @@ s#Pick the wake mechanism using Cursor's `/loop` command \(a built-in, not a pst
 s#A local root arms each tick as a real terminal `/loop`\. The loop uses a monitored-shell 30-minute sleep and emits an output-notification sentinel\.#A root in session arms each tick with omp's `/loop`, which re-submits the tick prompt after every yield.#
 s#A cloud root uses the existing cloud-sleeper wake chain instead\.#A wake that has to land out of session runs as a named bash process observed through `proc://`, or under a systemd user timer instead.#
 s#In a local session, a real terminal `/loop`\. In a cloud root, a cloud-sleeper wake chain\.#In session, omp's `/loop`. For a wake that must land out of session, use a named bash process observed through `proc://`, or a systemd user timer.#
-s#Run `drive` and `background` under `/loop` in dynamic mode\.#Run `drive` and `background` under omp's `/loop` while `loop.mode` is `prompt`, or under a named bash process observed through `proc://` when the wake must land out of session.#
+# Cursor's Babysit mode vocabulary. `drive`, `background`, `threads-only`, and `check` are Cursor
+# commands with no omp counterpart: omp's CLI has neither `drive` nor `background`, and the port's
+# own watcher declares WatchMode "single" | "stack" | "queued-stack" with no mode argument at all.
+# These sentences used to name all four, so an agent following this playbook was told to run
+# something that does not exist. Each now names an invocation of scripts/watch-pr/watch-pr, which
+# is what the playbook already points at for the verdict.
+s#Run `drive` and `background` under `/loop` in dynamic mode\.#Run the merge-ready loop, or the non-blocking triage, under omp's `/loop` while `loop.mode` is `prompt`, or under a named bash process observed through `proc://` when the wake must land out of session.#
+s#\*\*Declare the mode and resolve the forge before any poll\.\*\*#**Name the watcher invocation and resolve the forge before any poll.**#
+s#`drive` runs the loop to merge-ready, for "babysit this", "get it green", "merge-ready"\.#`drive`, `background`, `threads-only`, and `check` name no command on this runtime: omp's CLI has neither `drive` nor `background`, and the port's own watcher declares WatchMode "single" | "stack" | "queued-stack" and takes no mode argument at all. They are four ways to invoke `scripts/watch-pr/watch-pr`, which is what this playbook already points at for the verdict. To run the loop to merge-ready, for "babysit this", "get it green", "merge-ready", invoke the watcher bare and let it poll to a terminal verdict.#
+s#`background` triages without blocking, which is the mode for a plan still executing\.#To triage without blocking, which is what a plan still executing wants, invoke that same watcher as a named async `bash` job and read it through `proc://`; that is a scheduling choice, not a mode the watcher knows.#
+s#`threads-only` answers review comments and touches nothing else, for "address the bugbot comments"\.#To answer review comments and touch nothing else, for "address the bugbot comments", stop on the watcher's `BLOCKER` verdict with reason `review-threads` and work only those threads.#
+s#`check` is one status pass and a report, for "check on X" and "is it green"\.#For one status pass and a report, for "check on X" and "is it green", pass `--status-only`.#
+s#Undeclared defaults to `drive`\.#Undeclared defaults to the bare watcher.#
+s#Small or docs-only PRs get `check`, not `drive`\.#Small or docs-only PRs get `--status-only`, not the bare command.#
+s#In `check` mode pass `--status-only`\.#For a single status pass, pass `--status-only`.#
+s#The bare command polls until a terminal verdict, which is `drive` behavior\.#The bare command polls until a terminal verdict, which is the merge-ready loop.#
+s#On Origin, stop `drive` when the frontier is merge-ready:#On Origin, stop the polling loop when the frontier is merge-ready:#
+s#\*\*Reply:\*\* the mode, the frontier and its active-forge state#**Reply:** the watcher invocation, the frontier and its active-forge state#
 s#Hold the watch under `/loop` in dynamic mode\.#Hold the watch under omp's `/loop` while `loop.mode` is `prompt`, or under a named bash process observed through `proc://` when the wake must land out of session.#
 s#`/loop` per component until the diff is zero\.#Hold a named bash process observed through `proc://`, or a systemd timer, per component until the diff is zero.#
 s#a frontier watcher wake \(arm it via the loop skill, with a long heartbeat fallback\)#a frontier watcher wake (hold a named bash process observed through `proc://`, or a systemd timer, with a long fallback heartbeat)#

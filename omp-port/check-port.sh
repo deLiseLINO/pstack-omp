@@ -204,11 +204,14 @@ runtime_contract() {
 	# review threads most.
 	adopt skills/poteto-mode/playbooks/babysit.md 'pr://<n>' 'the github device read surface'
 	adopt skills/poteto-mode/playbooks/babysit.md 'Keep every *write* on the resolved forge' 'a single writer per mutation'
-	# A pr:// selector no doc names is the same class of error as the hub fiction this gate
-	# already bans, so pin the documented forms and refuse the invented cross-repo one.
-	if grep -rqE 'pr://<[a-z-]+>/<[a-z-]+>/<n>' "${SCOPE[@]}" 2>/dev/null; then
-		bad="$bad"'an undocumented pr://<owner>/<repo>/<n> selector'$'\n'
-	fi
+	# The cross-repo pr:// form is documented, not invented: <owner>/<repo>/ in front of <n> is how
+	# the scheme names a repository other than the current one. This used to be a ban on that exact
+	# string, so the gate would have failed correct future usage while the playbook that carried it
+	# told the agent the form did not exist. Requiring it is the assertion that was wanted: the
+	# failure being guarded against is an agent guessing a selector, and a playbook that never
+	# learned the real one is how that happens.
+	adopt skills/poteto-mode/playbooks/shipping.md 'pr://<owner>/<repo>/<n>' 'the documented cross-repo pr selector'
+	adopt skills/poteto-mode/playbooks/shipping.md 'rather than assuming a form is valid because it parses' 'read the surface doc instead of guessing a selector'
 	adopt skills/poteto-mode/playbooks/autopilot-stack.md 'proc://<name>/kill' 'the named proc watcher lifecycle'
 	adopt skills/poteto-mode/playbooks/orchestrate.md 'A refilling window is what a work pool is for' 'a pool for the refilling window'
 	adopt skills/poteto-mode/playbooks/orchestrate.md 'open a todo list with one entry per phase' 'root plan tracking'
@@ -218,6 +221,17 @@ runtime_contract() {
 	# playbook that repeats that claim sends a cold-start handoff through the wrong primitive.
 	if grep -qiE 'git-based checkpoint|checkpoint (snapshots|saves) (the |your )?(working tree|filesystem|files|repo|repository)' skills/poteto-mode/playbooks/pause-safely.md; then
 		bad="$bad"'skills/poteto-mode/playbooks/pause-safely.md claims checkpoint snapshots the filesystem'$'\n'
+	fi
+	# Cursor's Babysit named four modes and omp has none of them. An agent told to "run drive"
+	# would run nothing, so the playbook now names a watcher invocation instead. Both halves are
+	# pinned: the denial, so the explanation cannot quietly disappear, and the absence of the
+	# invocations, so a future upstream edit cannot reintroduce a mode name as something to run.
+	adopt skills/poteto-mode/playbooks/babysit.md 'name no command on this runtime' 'the denial that the four Cursor modes are not commands'
+	adopt skills/poteto-mode/playbooks/babysit.md 'WatchMode "single" | "stack" | "queued-stack"' 'the watcher modes the port actually implements'
+	# Case-insensitive on purpose: the sentence this has to catch is the one an upstream edit would
+	# naturally write, and "Run `drive`" capitalising the verb is the likeliest form of it.
+	if grep -rqiE '(run|invoke|use|stop|start|defaults to|get) `?(drive|background|threads-only)`?\b' skills/poteto-mode/playbooks/babysit.md; then
+		bad="$bad"'babysit.md instructs a Cursor mode name to be run; name a watch-pr invocation instead'$'\n'
 	fi
 	if [ -n "$bad" ]; then
 		report "capability wiring" "FAIL"
