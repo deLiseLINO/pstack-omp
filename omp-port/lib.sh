@@ -98,6 +98,31 @@ owned_paths() {
 		"$PORT_DIR/owned.txt"
 }
 
+# Owned paths that upstream also carries, and how many upstream commits have touched each between
+# the pin and <target>, as "<owned-path>\t<count>".
+#
+# Ownership is deliberate and the build is right to discard the built copy, but that is exactly what
+# makes an upstream edit to an owned path disappear with no conflict, no patch failure and no gate
+# failure. install_tree restores the checked-in copy over whatever the build produced; reproducible
+# copies owned paths out of the live tree before diffing, so it cannot see the difference; and the
+# resulting tree is byte-identical to the build by construction. Proven end to end on the base
+# branch: an upstream commit adding a section to setup-pstack/SKILL.md, the pin moved to it, real
+# build and install, section gone, `owned PASS` and `reproducible PASS`.
+#
+# This only means anything when the target differs from the pin. Compared to itself the count is
+# always zero, which is why it lives here rather than on the branch that introduced ownership: that
+# branch had no target to compare against.
+owned_upstream_drift() {
+	local target="$1" base="$2" rel up n
+	[ -d "$CANON/.git" ] || return 0
+	while IFS= read -r rel; do
+		up="pstack/$rel"
+		git -C "$CANON" cat-file -e "$target:$up" 2>/dev/null || continue
+		n=$(git -C "$CANON" rev-list --count "$base..$target" -- "$up" 2>/dev/null) || n=""
+		printf '%s\t%s\n' "$rel" "${n:-?}"
+	done < <(owned_paths)
+}
+
 # Step 4. The rm is what makes the build authoritative: a file upstream deleted, or one a
 # maintainer hand-added, is gone before the new tree lands. The owned paths are carried across it
 # from the worktree, so an owned file that is not committed yet survives its first build. Only a
