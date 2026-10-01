@@ -572,6 +572,23 @@ else
 	report "owned" "PASS  $ownn owned path(s) present"
 fi
 
+# Owning a path makes an upstream edit to it vanish silently, so the count is surfaced on every gate
+# run instead of being discovered later. A non-zero count is a maintainer decision, not a failure:
+# the built copy is discarded by design, which is what owning a path means. It says nothing when the
+# target is the pin, because a sha compared to itself has no commits between them.
+drift=$(owned_upstream_drift "$TARGET_SHA" "$PORT_PIN")
+moved=""
+while IFS=$'\t' read -r p n; do
+	[ -n "$p" ] || continue
+	[ "$n" = 0 ] || moved="${moved}  $p: $n upstream commit(s) since the pin, dropped by ownership"$'\n'
+done <<<"$drift"
+if [ -n "$moved" ]; then
+	report "owned drift" "REPORT"
+	printf '%s' "$moved"
+else
+	report "owned drift" "REPORT  no upstream commit has touched an owned path since the pin"
+fi
+
 # Every pstack skill assumes the Cursor mechanics. omp-mechanics is where the omp ones live, and
 # the injected reminder is the only thing that makes an agent read it.
 nomech=""
