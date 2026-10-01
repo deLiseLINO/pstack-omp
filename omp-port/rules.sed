@@ -10,8 +10,13 @@
 
 ## 1. Whole-sentence rewrites, which must read raw upstream text before any token rule edits it.
 
-# Cursor's reasoning-effort ladder over its own slug names -> a selector omp models reports.
-s#So `small` turns `claude-[a-z0-9.-]+` into `claude-[a-z0-9.-]+`, and `grok-[a-z0-9.-]+` into `[a-z0-9.-]+` when only that form is detected\.#So `small` takes the lowest-effort selector in the same family that `omp models` reports, and marks the role as needing a choice when that family offers none.#
+# Cursor's reasoning-effort ladder over its own slug names -> a selector omp models reports. The
+# left-hand side is upstream's sentence as it stands at the pin, nothing more: it used to end "when
+# only that form is detected.", a clause upstream dropped, and the rule then matched nothing at all
+# while sed still exited 0. That is the whole failure this gate exists to catch, caught here by
+# rewriting the left-hand side rather than by adding an exemption, because the translation it
+# carries is still wanted and the replacement text was already sitting unused below.
+s#So `small` turns `claude-[a-z0-9.-]+` into `claude-[a-z0-9.-]+`, and `grok-[a-z0-9.-]+` into `grok-[a-z0-9.-]+`\.#So `small` takes the lowest-effort selector in the same family that `omp models` reports, and marks the role as needing a choice when that family offers none.#
 # Cursor names the judgment slug twice in one clause; omp names the capability once.
 s#go to your strongest judgment model \(`claude-[a-z0-9.-]+`\)#go to your strongest judgment model#
 # Cursor reads the playbook from trunk because it is vendored there; omp reads the install.

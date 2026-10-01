@@ -56,6 +56,45 @@ There is nothing to resolve. The build never edits an upstream file in place, so
 port text cannot collide. A patch that no longer applies exits 1, and that or a gate FAIL leaves the
 PR open for a human with both outputs in the body and the reason printed in the job log.
 
+### What catches upstream moving
+
+`rules.sed` is a table of exact rewrites, and a `sed` rule whose left-hand side stops matching
+changes nothing while still exiting 0. That is the one failure mode in this port that is silent by
+construction, so the gate treats it as the thing to prove rather than as an absence of errors. It
+asks two questions and needs both, because each has a large healthy population:
+
+- `rule liveness` runs one marked build and lists the rules that substituted nothing. Most of that
+  list is the point: the token rules sit underneath the whole-sentence rules and fire nothing
+  precisely because an earlier rule already consumed their input, and that redundancy is the net
+  that catches a whole-sentence rule when it misses.
+- `rule staleness` applies each rule on its own to upstream as it stands, with the same `sed` and
+  the same `-E` the build uses, and intersects the result with the liveness list. Dead in isolation
+  *and* dead in the build is stale. Dead only in isolation is a rule fed by an earlier rule's
+  output and is ordinary. The intersection is why most rules need no exemption at all.
+
+A stale rule that upstream has outrun **fails** the gate. It is not a report, because the
+consequence is a Cursor API reaching a generated skill while every other check stays green. The
+fix is to correct the left-hand side against what upstream actually says now, or to record the rule
+in `omp-port/stale-exempt.tsv` with a reason. That file is keyed on a literal fragment of the rule
+and never on a line number, because a line number moves the moment anyone edits a rule above it and
+an exemption that silently stops applying is worse than no exemption.
+
+The probe's own exit status is part of the assertion for both. A probe that cannot run reports
+failure, not a clean result: an empty list from a failed build is not evidence that nothing is
+stale.
+
+`bash omp-port/check-port.sh [canonical-clone] [sha]` takes the sha to gate, defaulting to the pin.
+The tree assertions follow the pin, because they are about the checked-in tree; the upstream
+assertions follow the target, because they are about upstream text. That split is what makes an
+upstream change reviewable *before* it is synced: `upstream-sync` runs the gate a second time
+against the candidate sha, so a commit that outruns a rule stops the run with the rule named,
+rather than landing and being noticed later in a generated file. The same command answers the
+question locally:
+
+```bash
+bash omp-port/check-port.sh "" "$(gh api 'repos/cursor/plugins/commits?path=pstack&sha=main&per_page=1' --jq '.[0].sha')"
+```
+
 The gate runs as its own workflow, `gate.yml`, on every pull request and on every push to `main`. A
 PR opened with `github.token` does not trigger `pull_request` workflows, so the sync PR carries the
 gate output in its body and the `push` to `main` run after the merge is the backstop.

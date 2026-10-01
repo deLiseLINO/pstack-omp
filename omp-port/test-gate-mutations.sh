@@ -165,6 +165,52 @@ mutate_babysit_device() {
 
 expect_failure 'babysit device read surface' 'capability wiring' mutate_babysit_device
 
+# The upstream probes answer a question about omp-port/rules.sed, not about the generated tree, so
+# the fixture harness above cannot reach them: it mutates plugins/pstack and runs the gate with
+# CHECK_PORT_CONTRACTS_ONLY, which exits long before any upstream text is read. These two run the
+# real gate against a mutated copy of rules.sed instead, which is why they need the clone.
+STALE_RULES=$(mktemp)
+STALE_EXEMPT_FILE=$(mktemp)
+trap 'rm -rf "$FIXTURE" "$FIXTURE_DOCS" "$STALE_RULES" "$STALE_EXEMPT_FILE"' EXIT
+
+expect_stale_failure() {
+	local name=$1 output status
+	# CHECK_PORT_SKIP_MUTATIONS is not optional here. These two run the gate past the contract-only
+	# exit, so they reach the gate's own `gate mutations` step, which runs this harness, which runs
+	# them again. Without the guard the two call each other until the process table is gone.
+	if output=$(CANON="${CANON:-/tmp/cursor-plugins}" RULES="$STALE_RULES" STALE_EXEMPT="$STALE_EXEMPT_FILE" CHECK_PORT_SKIP_MUTATIONS=1 \
+		bash "$PORT_DIR/check-port.sh" 2>&1); then status=0; else status=$?; fi
+	if [ "$status" -eq 0 ]; then
+		printf 'mutation tests: %s unexpectedly passed\n' "$name"
+		fail=1
+	elif ! printf '%s\n' "$output" | grep -qF 'rule staleness'; then
+		printf 'mutation tests: %s failed for the wrong reason\n%s\n' "$name" "$output"
+		fail=1
+	else
+		printf 'mutation tests: %s rejected\n' "$name"
+	fi
+}
+
+if [ -d "${CANON:-/tmp/cursor-plugins}/.git" ]; then
+	# A rule whose left-hand side matches nothing upstream is the exact shape of the failure this
+	# gate exists for: sed exits 0, the tree builds, and the translation silently stops happening.
+	cp "$PORT_DIR/rules.sed" "$STALE_RULES"
+	printf '%s\n' 's#a sentence upstream has never contained#a replacement nobody sees#' >>"$STALE_RULES"
+	cp "$PORT_DIR/stale-exempt.tsv" "$STALE_EXEMPT_FILE"
+	expect_stale_failure 'rule matching no upstream text'
+
+	# A trailing blank line in the exemption file used to exempt every rule, because index() returns
+	# 1 for an empty needle. The guard against it is a one-line predicate, which is exactly the kind
+	# of thing that gets deleted as noise, so it gets a test.
+	cp "$PORT_DIR/rules.sed" "$STALE_RULES"
+	printf '%s\n' 's#a different sentence upstream has never contained#another replacement#' >>"$STALE_RULES"
+	cp "$PORT_DIR/stale-exempt.tsv" "$STALE_EXEMPT_FILE"
+	printf '\n' >>"$STALE_EXEMPT_FILE"
+	expect_stale_failure 'blank exemption row exempting everything'
+else
+	printf 'mutation tests: SKIP staleness mutations, no cursor/plugins clone at %s\n' "${CANON:-/tmp/cursor-plugins}"
+fi
+
 if [ "$fail" -ne 0 ]; then
 	printf 'mutation tests: FAIL\n'
 	exit 1

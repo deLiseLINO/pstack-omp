@@ -142,11 +142,36 @@ untiered_slugs() {
 	return "$st"
 }
 
-# Which substitution rules fire against the pinned upstream text. A rule whose left-hand side
-# no longer matches changes nothing and sed still exits 0, so without this the build cannot
-# distinguish a rule that substituted from one upstream has outrun. Each rule's replacement is
-# rewritten to carry its own line number as a marker, so one marked build answers for all of
-# them: a marker with no occurrence in the tree is a rule that matched nothing.
+# One rule per line as "<line-number>\t<rule>", comments and blanks dropped and a trailing
+# backslash continuation joined onto the rule it belongs to, so every record is something sed can
+# parse on its own. Both probes below read rules through this, and a rule split across lines would
+# otherwise be handed to sed as a fragment, which fails, which is indistinguishable from a rule
+# that matched nothing.
+rule_records() {
+	awk '
+		function flush() { if (buf != "") { printf "%d\t%s\n", start, buf; buf = "" } }
+		{
+			if (buf != "") {
+				buf = buf "\n" $0
+				if ($0 !~ /\\[[:space:]]*$/) flush()
+				next
+			}
+			if ($0 ~ /^[[:space:]]*#/ || $0 ~ /^[[:space:]]*$/) next
+			start = NR; buf = $0
+			if ($0 !~ /\\[[:space:]]*$/) flush()
+		}
+		END { flush() }
+	' "$RULES"
+}
+
+# Substitution rules that fire against the upstream text at <sha>, as "<line-number>\t<rule>".
+# A rule whose left-hand side no longer matches changes nothing and sed still exits 0, so without
+# this the build cannot distinguish a rule that substituted from one upstream has outrun. Each
+# rule's replacement is rewritten to carry its own line number as a marker, so one marked build
+# answers for all of them: a marker with no occurrence in the tree is a rule that matched nothing.
+# Most of what this reports is healthy. The token rules sit under the whole-sentence rules and fire
+# nothing precisely because an earlier rule already consumed their input, and that redundancy is
+# the safety net for when a whole-sentence rule misses.
 dead_rules() {
 	local sha="$1" work marked st=0
 	work=$(mktemp -d)
@@ -165,12 +190,66 @@ dead_rules() {
 			printf "s%s%s%s@%d@%s%s\n", d, substr(rest, 1, k - 1), d, NR, substr(body, 1, j - 1), substr(body, j)
 		}' "$RULES" >"$marked"
 	if extract_upstream "$sha" "$work" && apply_rules "$work" "$marked"; then
-		awk '/^s./ { print NR }' "$RULES" | while read -r n; do
-			grep -rqF "@$n@" "$work" 2>/dev/null || sed -n "${n}p" "$RULES" | cut -c1-100
-		done
+		while IFS=$'\t' read -r n rule; do
+			case "$rule" in s?*) ;; *) continue ;; esac
+			grep -rqF "@$n@" "$work" 2>/dev/null || printf '%s\t%s\n' "$n" "$rule"
+		done < <(rule_records)
 	else
 		st=1
 	fi
 	rm -rf "$work" "$marked"
+	return "$st"
+}
+
+# Rules that can never fire again, as "<line-number>\t<rule>", which is the intersection of two
+# questions and neither one alone.
+#
+# dead_rules asks which rules substituted nothing in a full marked build. That list is mostly
+# healthy: the token rules sit under the whole-sentence rules and fire nothing precisely because an
+# earlier rule already consumed their input, which is what makes them the net that catches a
+# whole-sentence rule when it misses. But it cannot say why a rule produced nothing, so a rule
+# upstream has outrun prints identically to a redundant one and nobody triages either.
+#
+# This applies each rule on its own to upstream as it stands, with the same sed and the same -E the
+# build uses, so the engine is never reimplemented and a pattern cannot mean one thing to the probe
+# and another to the build. A rule that changes nothing in isolation may still be fed by an earlier
+# rule's output, so intersecting with dead_rules is what separates the two: dead in isolation and
+# dead in the build is stale, dead only in the build is a net doing its job, and dead only in
+# isolation is ordinary and needs nothing. The intersection is why this gate needs no exemption for
+# the fed-by-earlier rules, which is most of them.
+#
+# A rule sed cannot parse exits non-zero, and treating that as "changed" would report a broken rule
+# as a healthy one, so a parse failure fails the probe rather than producing a result.
+#
+# Exits 1, printing nothing, when the extract or any rule fails to parse, so a caller cannot read an
+# empty result as "nothing is stale".
+stale_rules() {
+	# The dead-rule set is the other half of the intersection, and the caller has just computed it
+	# for the assertion above. Passing it in halves the gate's wall time; recomputing it here when
+	# absent costs one extra marked build and keeps this function usable on its own.
+	local sha="$1" deadset="${2-}" work blob rule n st=0 out
+	work=$(mktemp -d)
+	blob=$(mktemp)
+	out=$(mktemp)
+	if extract_upstream "$sha" "$work"; then
+		find "$work" -type f -print0 | xargs -0 cat >"$blob" 2>/dev/null || :
+		[ -n "$deadset" ] || deadset=$(dead_rules "$sha") || deadset=''
+		while IFS=$'\t' read -r n rule; do
+			printf '%s\n' "$rule" >"$work/rule.sed"
+			if ! sed -E -f "$work/rule.sed" "$blob" >"$work/out" 2>/dev/null; then
+				st=1
+				break
+			fi
+			cmp -s "$work/out" "$blob" || continue
+			# Unchanged in isolation. Still only a candidate: it is stale only if it also produced
+			# nothing in the real build, which is how a rule fed by an earlier rule is excluded.
+			printf '%s\t' "$n" | grep -qxF "$n" <(cut -f1 <<<"$deadset") || continue
+			printf '%s\t%s\n' "$n" "$rule" >>"$out"
+		done < <(rule_records)
+	else
+		st=1
+	fi
+	if [ "$st" -eq 0 ]; then cat "$out"; fi
+	rm -rf "$work" "$blob" "$out"
 	return "$st"
 }
