@@ -2,6 +2,11 @@ name: gate
 
 on:
   pull_request:
+    # `edited` is load-bearing for a stacked port: merging by retargeting each PR's base to main
+    # fires that activity type, and with the default set the one change that invalidates a gate run
+    # is the change that leaves the gate unrun, so the pre-retarget green reads as evidence for the
+    # post-retarget state. Folded in from the CI-guards change so both land in one file hunk.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
