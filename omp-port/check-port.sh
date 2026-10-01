@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # Gate for the omp port of pstack. Port-only file, never upstream.
-# Usage: bash omp-port/check-port.sh [canonical-clone]
-# The argument, or CANON, is the cursor/plugins clone the reproducible check builds from.
+# Usage: bash omp-port/check-port.sh [canonical-clone] [sha]
+# The first argument, or CANON, is the cursor/plugins clone the reproducible check builds from.
+# The second is the upstream sha to gate, defaulting to the pin. Pointing it at a sha other than
+# the pin is what makes an upstream change reviewable before it is synced: sync-upstream.sh check
+# lists the commits, and this asks the question the commit list cannot, which is whether the port
+# still builds clean against text nobody has ported yet. Without it the gate can only ever speak
+# about a sha that is already merged, so the first moment a rules.sed rule has been outrun is the
+# moment after the pin moved and the tree was rewritten.
 set -uo pipefail
 . "$(dirname "$0")/lib.sh"
 PLUGIN_ROOT=${CHECK_PORT_ROOT:-"$(dirname "$0")/../plugins/pstack"}
 cd "$PLUGIN_ROOT"
 CANON="${1:-$CANON}"
+PORT_PIN=$(tr -d '[:space:]' <"$PORT_DIR/UPSTREAM")
+TARGET_SHA="${2:-$PORT_PIN}"
 fail=0
 report() { printf '%-28s %s\n' "$1" "$2"; }
 violate() { fail=1; printf '  %s\n' "$1"; }
@@ -22,6 +30,28 @@ allowed() {
 	awk -F'\t' -v k="$1" -v p="$2" '$1 == k && $2 == p { hit = 1 } END { exit !hit }' "$ALLOW"
 }
 allow_count() { awk -F'\t' -v p="$2" '$0 !~ /^#/ && $2 == p' "$1" | wc -l; }
+
+# A stale-rule exemption is `left-hand-fragment<TAB>reason`. The fragment is matched as a literal
+# substring of the rule's own line, never as a line number: a line number moves the moment anyone
+# edits a rule above it, and an exemption that silently stops applying is worse than none, because
+# the gate then goes red for a reason nobody can reconstruct. A fragment survives every edit that
+# does not change the rule it names.
+STALE_ALLOW="${STALE_EXEMPT:-$PORT_DIR/stale-exempt.tsv}"
+exempt() {
+	[ -f "$STALE_ALLOW" ] || return 1
+	# The needle travels through the environment rather than -v, because awk applies escape
+	# processing to a -v assignment and a rules.sed left-hand side is full of backslashes: it would
+	# warn about every one of them and match the stripped text instead of the rule.
+	STALE_RULE="$1" awk -F'\t' '
+		BEGIN { rule = ENVIRON["STALE_RULE"] }
+		$1 != "" && $0 !~ /^#/ && index(rule, $1) { hit = 1 }
+		END { exit !hit }
+	' "$STALE_ALLOW"
+}
+exempt_count() {
+	[ -f "$STALE_ALLOW" ] || { echo 0; return; }
+	awk -F'\t' '$1 != "" && $0 !~ /^#/' "$STALE_ALLOW" | wc -l
+}
 # The gate patterns live in omp-port/lib.sh, one source shared with the sync script.
 pattern_for() {
 	case "$1" in
@@ -353,14 +383,22 @@ if [ "${CHECK_PORT_CONTRACTS_ONLY:-}" = 1 ]; then
 	exit "$fail"
 fi
 
-mutation_log=$(mktemp)
-if bash "$PORT_DIR/test-gate-mutations.sh" >"$mutation_log" 2>&1; then
-	report "gate mutations" "PASS  ownership, alias, effort, and per-file lever mutations rejected"
+# The harness runs this gate, so a caller that needs an assertion living past this line has to be
+# able to switch this step off or the two call each other forever. CHECK_PORT_CONTRACTS_ONLY above
+# serves the fixture mutations, which only need the contract assertions; this serves the staleness
+# mutations, which need the upstream probes below and would otherwise re-enter this step.
+if [ "${CHECK_PORT_SKIP_MUTATIONS:-}" = 1 ]; then
+	report "gate mutations" "SKIP  recursion guard set by the mutation harness"
 else
-	report "gate mutations" "FAIL"
-	while read -r line; do [ -n "$line" ] && violate "$line"; done <"$mutation_log"
+	mutation_log=$(mktemp)
+	if bash "$PORT_DIR/test-gate-mutations.sh" >"$mutation_log" 2>&1; then
+		report "gate mutations" "PASS  ownership, alias, effort, and per-file lever mutations rejected"
+	else
+		report "gate mutations" "FAIL"
+		while read -r line; do [ -n "$line" ] && violate "$line"; done <"$mutation_log"
+	fi
+	rm -f "$mutation_log"
 fi
-rm -f "$mutation_log"
 
 missing=""
 while read -r p; do
@@ -508,13 +546,18 @@ else
 	report "mechanics" "PASS  omp-mechanics installed and named in the reminder"
 fi
 
-# The tree is build output. Rebuilding the pin has to reproduce it byte for byte outside the
-# owned paths, otherwise someone hand-edited a file the next sync will overwrite.
-pin=$(tr -d '[:space:]' <"$PORT_DIR/UPSTREAM")
+# The tree is build output. Rebuilding the pin has to reproduce it byte for byte outside the owned
+# paths, otherwise someone hand-edited a file the next sync will overwrite. That assertion is about
+# the checked-in tree, so it follows the pin and nothing else. The three assertions after it are
+# about upstream text, so they follow the target, and that split is the whole point of taking a
+# target: the tree assertions can only ever speak about a sha already merged, while the upstream
+# assertions can be pointed at text nobody has ported yet, which is the only moment a stale
+# rules.sed rule is still cheap to learn about.
+pin="$PORT_PIN"
 scratch=$(mktemp -d)
 buildlog=$(mktemp)
 canon_ok=no
-if ! ensure_canon "$pin" >"$buildlog" 2>&1; then
+if ! ensure_canon "$TARGET_SHA" >"$buildlog" 2>&1 || ! ensure_canon "$pin" >>"$buildlog" 2>&1; then
 	# A skipped reproduction on a developer box is a nuisance. In CI it would hide the one
 	# invariant this gate exists to prove behind a green check.
 	if [ -n "${CI:-}" ]; then
@@ -546,27 +589,65 @@ else
 fi
 
 if [ "$canon_ok" = yes ]; then
-	untiered=$(untiered_slugs "$pin" | sed 's/^/  /')
+	untiered=$(untiered_slugs "$TARGET_SHA" | sed 's/^/  /')
 	if [ -n "$untiered" ]; then
-		report "untiered slugs" "REPORT  $(printf '%s\n' "$untiered" | wc -l) slug(s) only the catch-all rewrote"
+		report "untiered slugs" "REPORT  $(printf '%s\n' "$untiered" | wc -l) slug(s) only the catch-all rewrote at ${TARGET_SHA:0:7}"
 		printf '%s\n' "$untiered"
 	else
-		report "untiered slugs" "REPORT  none, every slug has a tiered rule"
+		report "untiered slugs" "REPORT  none, every slug has a tiered rule at ${TARGET_SHA:0:7}"
 	fi
 else
 	report "untiered slugs" "SKIP  needs the clone at $CANON"
 fi
 
 if [ "$canon_ok" = yes ]; then
-	dead=$(dead_rules "$pin" | sed 's/^/  rules.sed:/')
-	if [ -n "$dead" ]; then
-		report "rule liveness" "REPORT  $(printf '%s\n' "$dead" | wc -l) rule(s) matched nothing at the pin"
-		printf '%s\n' "$dead"
+	# The probe's own status is part of the assertion. dead_rules returns non-zero with nothing on
+	# stdout when the marked build fails, so reading only stdout turns a probe that could not run
+	# into the strongest green this gate can print. An unknown result is a failure, not a clean one.
+	if dead=$(dead_rules "$TARGET_SHA" 2>/dev/null); then
+		if [ -n "$dead" ]; then
+			report "rule liveness" "REPORT  $(printf '%s\n' "$dead" | wc -l) rule(s) matched nothing at ${TARGET_SHA:0:7}"
+			printf '%s\n' "$dead" | sed 's/^/  rules.sed:/'
+		else
+			report "rule liveness" "PASS  every substitution rule matched at ${TARGET_SHA:0:7}"
+		fi
 	else
-		report "rule liveness" "PASS  every substitution rule matched at the pin"
+		report "rule liveness" "FAIL"
+		violate "the marked build failed, so liveness is unknown; an empty result here is not a clean one"
 	fi
 else
 	report "rule liveness" "SKIP  needs the clone at $CANON"
+fi
+
+if [ "$canon_ok" = yes ]; then
+	# The assertion that answers the question this gate exists to ask: has upstream moved past a
+	# rule? A rule whose left-hand side matches nothing in raw upstream can never fire again, so the
+	# translation it was written to perform is not being applied, and sed exiting 0 is the only thing
+	# that kept that quiet. Shadowed rules do not land here: a rule fed by an earlier rule's output
+	# matches nothing in isolation but still fires in the build, which is why this probe is separate
+	# from rule liveness above and why neither alone answers the question.
+	if stale=$(stale_rules "$TARGET_SHA" "$dead"); then
+		unexempted=""
+		while IFS=$'\t' read -r n rule; do
+			[ -n "$n" ] || continue
+			exempt "$rule" || unexempted="${unexempted}rules.sed:${n}: ${rule}"$'\n'
+		done <<<"$stale"
+		total=$(grep -c . <<<"$stale" || true)
+		if [ -n "$unexempted" ]; then
+			report "rule staleness" "FAIL"
+			while read -r l; do [ -n "$l" ] && violate "$l"; done <<<"$unexempted"
+			violate "a rule matching no upstream text can never fire again; fix its left-hand side, or exempt it in omp-port/stale-exempt.tsv with a reason"
+		elif [ "${total:-0}" -gt 0 ]; then
+			report "rule staleness" "PASS  $total stale rule(s) at ${TARGET_SHA:0:7}, all exempted"
+		else
+			report "rule staleness" "PASS  every rule matches upstream text at ${TARGET_SHA:0:7}"
+		fi
+	else
+		report "rule staleness" "FAIL"
+		violate "the upstream extract failed, so staleness is unknown; an empty result here is not a clean one"
+	fi
+else
+	report "rule staleness" "SKIP  needs the clone at $CANON"
 fi
 rm -rf "$scratch" "$buildlog"
 
