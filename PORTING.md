@@ -230,7 +230,10 @@ The injected reminder is a pointer, not the playbook. It tells the agent to read
   missing capability.
 - **The control CLI's driving surface.** `browser` (CDP, `tab.observe`/`screenshot`/`evaluate`) and
   `computer` (native desktop plus a11y tree) are eval preludes, not tools. Long-running processes
-  are a `bash` call with a unique async `name`, a `ready` block, and `read proc://<id>` for state.
+  are a `bash` call with a unique `name`, a `ready` block, and `read proc://<name>` for state. The
+  `name` selects supervised service mode and is incompatible with `async: true` or a supplied
+  `timeout`; `async` is the other backgrounding path, for a finite command, and it hands back a job
+  id read at `proc://<id>`. Two mechanisms, not two flags on one call.
   Agent Hub is a human-facing TUI, not a programmatic interface, so nothing addresses workers
   through it. `debug` is full DAP with breakpoints, eval, and stack. A generated `control-<app>`
   script only needs app-specific semantics, `doctor`, `new-session`, `seed`/auth, `feature-flag`,

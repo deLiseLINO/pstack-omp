@@ -44,8 +44,10 @@ a separate extension; do not expect this plugin to supply it.
 ## What differs from upstream
 
 Every Cursor mechanic is substituted for its omp equivalent. Cloud agents become
-`isolated: true` subagents. An out-of-session `/loop` wake becomes a named async `bash` process
-observed through `read proc://`, or a systemd user timer. Cursor transcripts become
+`isolated: true` subagents. An out-of-session `/loop` wake becomes a supervised `bash` process
+carrying a unique `name`, observed through `read proc://<name>`, or a systemd user timer. The
+`name` selects service mode and cannot be combined with `async: true`; `async` is the separate
+finite-command path and hands back a job id. Cursor transcripts become
 `~/.omp/agent/sessions/`, and worker output is read at `agent://<id>`. No skill names a vendor
 model. Name a capability, bind it once in `modelRoles`, pick the chat model with `/model`.
 
