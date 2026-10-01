@@ -77,7 +77,11 @@ else
 	report "review diversity" "PASS  interrogate, arena, and reflect state exact diversity requirements"
 fi
 
-ver=$(grep -rIni -oE '(^|[^0-9])(omp|since)[[:space:]]+v?[0-9]+\.[0-9]+(\.[0-9]+)?' --include='*.md' "${SCOPE[@]}" 2>/dev/null || true)
+# `[[:space:]/]` rather than whitespace alone: main's pattern was `omp[/ ]?1[0-9]+\.[0-9]+`, which
+# caught the slash form, and narrowing it to whitespace made `omp/18.1.9` invisible while the gate
+# still claimed to be strengthening the check. Verified both ways: with a space the old pattern
+# fired, with a slash it did not.
+ver=$(grep -rIni -oE '(^|[^0-9])(omp|since)[[:space:]/]+v?[0-9]+\.[0-9]+(\.[0-9]+)?' --include='*.md' "${SCOPE[@]}" 2>/dev/null || true)
 if [ -n "$ver" ]; then
 	report "version-agnostic" "FAIL"
 	while read -r v; do violate "version-pinned: $v"; done <<<"$ver"
@@ -89,11 +93,17 @@ scan "$PAT_CAPS" "capability claims" caps
 
 scan "$PAT_RESIDUE" "cursor residue" residue
 
-ro=$(grep -riIn -E '\breadonly\b' --include='*.md' "${SCOPE[@]}" 2>/dev/null || true)
-bad_ro=$(printf '%s\n' "$ro" | awk '{ s = tolower($0); if (s !~ /readonly/) next; if (s ~ /readonly __brand|readonly string|readonly \[|readonly</) next; if (s ~ /(no|not|never|without)[^.;]{0,80}readonly/) next; print }')
-if [ -n "$bad_ro" ]; then
+# A positive pattern over the Cursor wire shapes, not a ban on the English word. The previous form
+# grepped every occurrence of `readonly` and tried to rescue legitimate prose with an allowlist and a
+# negation skip, and both leaked: "Do not use readonly/Ask mode" contains "not", so the skip threw
+# away the exact sentence the assertion exists to catch, while a legitimate TypeScript sentence the
+# allowlist did not happen to name would have failed the build. This names the shapes instead, so
+# `readonly __brand` and `readonly owner: string` in the tree's own TypeScript are simply not matches.
+ro=$(grep -rInE '`?readonly`?\s*:\s*`?(true|false)`?|readonly[ /]Ask|readonly mode|agent mode \(`?readonly' \
+	--include='*.md' "${SCOPE[@]}" 2>/dev/null || true)
+if [ -n "$ro" ]; then
 	report "readonly posture" "FAIL"
-	while read -r r; do [ -n "$r" ] && violate "unsupported readonly directive: $r"; done <<<"$bad_ro"
+	while read -r r; do [ -n "$r" ] && violate "unsupported readonly directive: $r"; done <<<"$ro"
 else
 	report "readonly posture" "PASS  no readonly task field or prose directive"
 fi
@@ -139,9 +149,15 @@ runtime_contract() {
 	fi
 
 
+	# The two tokens have to co-occur ON ONE LINE. Two independent whole-file greps pass a file whose
+	# dispatch line was reverted to Cursor's non-batch shape as long as some other line still carries
+	# both tokens, which is exactly what happens in arena: Phase C's judge line has them, so deleting
+	# them from Phase B's spawn line is invisible. Verified: replacing the batch instruction with
+	# "Spawn all N subagents in one message" left this assertion PASS before the fix.
 	bad=""
 	for f in skills/arena/SKILL.md skills/swarm/SKILL.md skills/reflect/SKILL.md skills/interrogate/SKILL.md; do
-		grep -q 'tasks\[\]' "$f" && grep -q 'required shared `context`' "$f" || bad="$bad$f lacks the tasks[] batch shape or its required shared context"$'\n'
+		grep -qE 'tasks\[\].*required shared .context.|required shared .context..*tasks\[\]' "$f" ||
+			bad="$bad$f has no single line naming both the tasks[] batch and its required shared context"$'\n'
 	done
 	if [ -n "$bad" ]; then
 		report "runtime batch context" "FAIL"
