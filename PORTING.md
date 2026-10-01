@@ -67,6 +67,11 @@ asks two questions and needs both, because each has a large healthy population:
   list is the point: the token rules sit underneath the whole-sentence rules and fire nothing
   precisely because an earlier rule already consumed their input, and that redundancy is the net
   that catches a whole-sentence rule when it misses.
+- `target builds` is the only upstream assertion that runs the whole build rather than probing
+  text. Every other one reads upstream directly, and none of them runs `omp-port/patches`, so
+  without it an upstream commit that rewords a line a patch matches on passes the gate and the sync
+  it clears cannot be applied. It is skipped when the target is the pin, because `reproducible` has
+  already built exactly that tree.
 - `rule staleness` applies each rule on its own to upstream as it stands, with the same `sed` and
   the same `-E` the build uses, and intersects the result with the liveness list. Dead in isolation
   *and* dead in the build is stale. Dead only in isolation is a rule fed by an earlier rule's

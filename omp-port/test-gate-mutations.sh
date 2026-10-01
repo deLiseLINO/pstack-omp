@@ -187,7 +187,11 @@ expect_failure 'babysit mode denial removed' 'capability wiring' mutate_babysit_
 # real gate against a mutated copy of rules.sed instead, which is why they need the clone.
 STALE_RULES=$(mktemp)
 STALE_EXEMPT_FILE=$(mktemp)
-trap 'rm -rf "$FIXTURE" "$FIXTURE_DOCS" "$STALE_RULES" "$STALE_EXEMPT_FILE"' EXIT
+STALE_PATCHES=$(mktemp -d)
+# The pin's parent is a real cursor/plugins commit that touched pstack/, so it is a legal sync
+# target and differs from the pin, which is what `target builds` needs in order to run at all.
+PIN_PARENT=$(git -C "${CANON:-/tmp/cursor-plugins}" rev-parse "$(tr -d '[:space:]' <"$PORT_DIR/UPSTREAM")^" 2>/dev/null || true)
+trap 'rm -rf "$FIXTURE" "$FIXTURE_DOCS" "$STALE_RULES" "$STALE_EXEMPT_FILE" "$STALE_PATCHES"' EXIT
 
 expect_stale_failure() {
 	local name=$1 output status
@@ -207,6 +211,28 @@ expect_stale_failure() {
 	fi
 }
 
+# `target builds` is skipped when the target is the pin, because `reproducible` has already built
+# exactly that tree. Testing it therefore needs a target that differs, so this uses the pin's parent
+# on cursor/plugins, which is a real commit that touched pstack/ and so is a legal sync target.
+expect_target_failure() {
+	local name=$1 output status canon="${CANON:-/tmp/cursor-plugins}"
+	# CANON is resolved into a local first: an inline env assignment does not affect how a later
+	# "$CANON" on the same line expands, so writing it inline silently passes an empty clone path
+	# and every upstream assertion silently skips.
+	if output=$(CANON="$canon" RULES="$STALE_RULES" STALE_EXEMPT="$STALE_EXEMPT_FILE" \
+		PATCH_DIR="$STALE_PATCHES" CHECK_PORT_SKIP_MUTATIONS=1 \
+		bash "$PORT_DIR/check-port.sh" "$canon" "${2:-$PIN_PARENT}" 2>&1); then status=0; else status=$?; fi
+	if [ "$status" -eq 0 ]; then
+		printf 'mutation tests: %s unexpectedly passed\n' "$name"
+		fail=1
+	elif ! printf '%s\n' "$output" | grep -qF 'target builds'; then
+		printf 'mutation tests: %s failed for the wrong reason\n%s\n' "$name" "$output"
+		fail=1
+	else
+		printf 'mutation tests: %s rejected\n' "$name"
+	fi
+}
+
 if [ -d "${CANON:-/tmp/cursor-plugins}/.git" ]; then
 	# A rule whose left-hand side matches nothing upstream is the exact shape of the failure this
 	# gate exists for: sed exits 0, the tree builds, and the translation silently stops happening.
@@ -215,14 +241,37 @@ if [ -d "${CANON:-/tmp/cursor-plugins}/.git" ]; then
 	cp "$PORT_DIR/stale-exempt.tsv" "$STALE_EXEMPT_FILE"
 	expect_stale_failure 'rule matching no upstream text'
 
-	# A trailing blank line in the exemption file used to exempt every rule, because index() returns
-	# 1 for an empty needle. The guard against it is a one-line predicate, which is exactly the kind
-	# of thing that gets deleted as noise, so it gets a test.
+	# Two rows that used to exempt every rule. index() returns 1 for an empty needle, so a blank
+	# row matched everything; and a run of twenty spaces is twenty characters long and index() finds
+	# it in almost any rule, so a length floor alone does not save it. The guards are two predicates
+	# in a matcher, which is exactly the kind of thing that gets deleted as noise, so both get a
+	# test. The fragment here is deliberately long enough to clear the length floor.
 	cp "$PORT_DIR/rules.sed" "$STALE_RULES"
 	printf '%s\n' 's#a different sentence upstream has never contained#another replacement#' >>"$STALE_RULES"
 	cp "$PORT_DIR/stale-exempt.tsv" "$STALE_EXEMPT_FILE"
+	printf ' \t                     \n' >>"$STALE_EXEMPT_FILE"
+	expect_stale_failure 'whitespace-only exemption row exempting everything'
+
+	# And the same file missing its trailing newline, which made the mutation above a byte-for-byte
+	# duplicate of the one before it: the append landed on the end of an unterminated final line and
+	# changed nothing. Both rows are live assertions only if the file ends in a newline.
+	cp "$PORT_DIR/rules.sed" "$STALE_RULES"
+	printf '%s\n' 's#a third sentence upstream has never contained#a third replacement#' >>"$STALE_RULES"
+	cp "$PORT_DIR/stale-exempt.tsv" "$STALE_EXEMPT_FILE"
 	printf '\n' >>"$STALE_EXEMPT_FILE"
 	expect_stale_failure 'blank exemption row exempting everything'
+
+	# The target-build assertion is the one that closes the hole where every upstream probe read
+	# text directly and none of them ran omp-port/patches, so an upstream commit reordering a line a
+	# patch matches on passed the gate with a sync that could not be applied. The reproducer is a
+	# patch whose context line has been reworded, which is what an upstream edit looks like from
+	# here.
+	cp "$PORT_DIR/rules.sed" "$STALE_RULES"
+	cp "$PORT_DIR/patches/zz-live-runtime-routing.patch" "$STALE_PATCHES/zz-live-runtime-routing.patch"
+	printf '\n@@ -1,1 +1,1 @@\n-a context line that does not exist upstream\n+b replacement\n' \
+		>>"$STALE_PATCHES/zz-live-runtime-routing.patch"
+	cp "$PORT_DIR/stale-exempt.tsv" "$STALE_EXEMPT_FILE"
+	expect_target_failure 'patch context no longer matches upstream'
 else
 	printf 'mutation tests: SKIP staleness mutations, no cursor/plugins clone at %s\n' "${CANON:-/tmp/cursor-plugins}"
 fi

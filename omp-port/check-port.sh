@@ -42,15 +42,37 @@ exempt() {
 	# The needle travels through the environment rather than -v, because awk applies escape
 	# processing to a -v assignment and a rules.sed left-hand side is full of backslashes: it would
 	# warn about every one of them and match the stripped text instead of the rule.
+	#
+	# Three ways a substring match can go wrong are closed here, because each one silently exempts
+	# more than the author intended and a wrong exemption turns the gate green, which is the exact
+	# failure this assertion exists to prevent:
+	#   a whitespace-only fragment, which index() matches against almost any rule, so a stray tab
+	#     or a double space in the file would exempt the entire table;
+	#   a fragment too short to be distinctive, which a later rule could match by accident;
+	#   a fragment that is only a prefix of a longer rule, which exempts that rule wholesale.
 	STALE_RULE="$1" awk -F'\t' '
 		BEGIN { rule = ENVIRON["STALE_RULE"] }
-		$1 != "" && $0 !~ /^#/ && index(rule, $1) { hit = 1 }
+		$0 !~ /^#/ {
+			f = $1
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "", f)
+			# The length floor alone is not enough: a run of twenty spaces is twenty characters long
+			# and index() finds it in almost any rule, so a whitespace-only row exempts the table.
+			if (length(f) >= 20 && f ~ /[^[:space:]]/ && index(rule, f)) hit = 1
+		}
 		END { exit !hit }
 	' "$STALE_ALLOW"
 }
-exempt_count() {
-	[ -f "$STALE_ALLOW" ] || { echo 0; return; }
-	awk -F'\t' '$1 != "" && $0 !~ /^#/' "$STALE_ALLOW" | wc -l
+# Every fragment has to clear the same bar the matcher enforces, so a typo is caught at review time
+# rather than discovered as an exemption that quietly stopped applying.
+stale_exempt_bad() {
+	[ -f "$STALE_ALLOW" ] || return 0
+	awk -F'\t' '
+		$0 !~ /^#/ {
+			f = $1
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "", f)
+			if (f !~ /[^[:space:]]/ || length(f) < 20)
+				printf "  rules.sed exemption fragment is blank or under 20 chars: [%s]\n", f
+	' "$STALE_ALLOW"
 }
 # The gate patterns live in omp-port/lib.sh, one source shared with the sync script.
 pattern_for() {
@@ -228,9 +250,12 @@ runtime_contract() {
 	# invocations, so a future upstream edit cannot reintroduce a mode name as something to run.
 	adopt skills/poteto-mode/playbooks/babysit.md 'name no command on this runtime' 'the denial that the four Cursor modes are not commands'
 	adopt skills/poteto-mode/playbooks/babysit.md 'WatchMode "single" | "stack" | "queued-stack"' 'the watcher modes the port actually implements'
-	# Case-insensitive on purpose: the sentence this has to catch is the one an upstream edit would
-	# naturally write, and "Run `drive`" capitalising the verb is the likeliest form of it.
-	if grep -rqiE '(run|invoke|use|stop|start|defaults to|get) `?(drive|background|threads-only)`?\b' skills/poteto-mode/playbooks/babysit.md; then
+	# Word boundaries on BOTH sides, or the pattern is wrong in two directions at once. Without a
+	# left boundary "Restart background tasks" matches on the `start` inside `Restart`, so ordinary
+	# English trips it; without a right boundary the verb and the name may be separated by filler
+	# words, so "Run the drive loop" sails past. The mode name is also required to be bare or
+	# backticked, which is how it appeared in every sentence that actually instructed an agent.
+	if grep -rqiE '\b(run|invoke|use|stop|start|defaults to|get|pick|choose|select)(\s+the)?\s+`?(drive|background|threads-only)`?\b' skills/poteto-mode/playbooks/babysit.md; then
 		bad="$bad"'babysit.md instructs a Cursor mode name to be run; name a watch-pr invocation instead'$'\n'
 	fi
 	if [ -n "$bad" ]; then
@@ -578,7 +603,14 @@ if ! ensure_canon "$TARGET_SHA" >"$buildlog" 2>&1 || ! ensure_canon "$pin" >>"$b
 		report "reproducible" "FAIL"
 		violate "no clone at $CANON and cloning $UPSTREAM_URL failed, CI cannot skip this"
 	else
-		report "reproducible" "SKIP  no clone at $CANON and cloning $UPSTREAM_URL failed"
+		# Name the cause rather than assuming it was the clone, and treat an unresolvable target as
+		# a failure rather than a skip: a sha we could not read is not a sha we cleared.
+		if ! git -C "$CANON" cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
+			report "reproducible" "FAIL"
+			violate "target sha $TARGET_SHA does not resolve in the clone at $CANON, so nothing about it was checked"
+		else
+			report "reproducible" "SKIP  no clone at $CANON and cloning $UPSTREAM_URL failed"
+		fi
 	fi
 elif ! build_tree "$pin" "$scratch" >>"$buildlog" 2>&1; then
 	report "reproducible" "FAIL"
@@ -602,13 +634,43 @@ else
 	fi
 fi
 
-if [ "$canon_ok" = yes ]; then
-	untiered=$(untiered_slugs "$TARGET_SHA" | sed 's/^/  /')
-	if [ -n "$untiered" ]; then
-		report "untiered slugs" "REPORT  $(printf '%s\n' "$untiered" | wc -l) slug(s) only the catch-all rewrote at ${TARGET_SHA:0:7}"
-		printf '%s\n' "$untiered"
+# The target has to BUILD, not merely have its rules probed. Every assertion above reads upstream
+# text directly and none of them runs omp-port/patches, so an upstream commit that rewords a line a
+# patch matches on would otherwise sail through: rule staleness, liveness and the slug tiers would
+# all be perfectly happy while the sync could not be applied at all. The patch layer is the one
+# part of this build that fails loudly on its own, and this is what makes that loudness reachable
+# before the pin moves rather than after. Skipped when the target is the pin, because
+# `reproducible` has already built exactly that tree a few lines up.
+if [ "$canon_ok" = yes ] && [ "$TARGET_SHA" != "$pin" ]; then
+	tscratch=$(mktemp -d)
+	if build_tree "$TARGET_SHA" "$tscratch" >"$buildlog" 2>&1; then
+		report "target builds" "PASS  rules and patches apply at ${TARGET_SHA:0:7}"
 	else
-		report "untiered slugs" "REPORT  none, every slug has a tiered rule at ${TARGET_SHA:0:7}"
+		report "target builds" "FAIL"
+		violate "the build fails at ${TARGET_SHA:0:7}: a rule or a patch no longer applies, so this upstream commit cannot be synced yet"
+		while read -r l; do [ -n "$l" ] && violate "$l"; done < <(tail -n 5 "$buildlog")
+	fi
+	rm -rf "$tscratch"
+elif [ "$TARGET_SHA" = "$pin" ]; then
+	report "target builds" "SKIP  target is the pin, reproducible already built it"
+else
+	report "target builds" "SKIP  needs the clone at $CANON"
+fi
+
+# Same rule as the two probes below: the probe's exit status is part of the result. untiered_slugs
+# returns non-zero when its build fails, and an empty list from a failed build is not evidence that
+# every slug has a tiered rule.
+if [ "$canon_ok" = yes ]; then
+	if untiered=$(untiered_slugs "$TARGET_SHA" 2>/dev/null); then
+		if [ -n "$untiered" ]; then
+			report "untiered slugs" "REPORT  $(printf '%s\n' "$untiered" | wc -l) slug(s) only the catch-all rewrote at ${TARGET_SHA:0:7}"
+			printf '%s\n' "$untiered" | sed 's/^/  /'
+		else
+			report "untiered slugs" "REPORT  none, every slug has a tiered rule at ${TARGET_SHA:0:7}"
+		fi
+	else
+		report "untiered slugs" "FAIL"
+		violate "the catch-all probe failed, so coverage is unknown; an empty list here is not a clean one"
 	fi
 else
 	report "untiered slugs" "SKIP  needs the clone at $CANON"
@@ -662,6 +724,18 @@ if [ "$canon_ok" = yes ]; then
 	fi
 else
 	report "rule staleness" "SKIP  needs the clone at $CANON"
+fi
+
+# A fragment that is blank or shorter than the matcher requires exempts nothing at all, which reads
+# like a working exemption and is not one. Linted separately so the mistake surfaces whether or not
+# any rule is currently stale.
+bad_frag=$(stale_exempt_bad)
+if [ -n "$bad_frag" ]; then
+	report "stale exemptions" "FAIL"
+	while read -r l; do [ -n "$l" ] && violate "$l"; done <<<"$bad_frag"
+	violate "an exemption fragment that is blank or under 20 characters exempts nothing, so the rule it was written for will fail for the wrong reason"
+else
+	report "stale exemptions" "PASS  $(grep -cvE '^[[:space:]]*(#|$)' "$STALE_ALLOW" 2>/dev/null || echo 0) fragment(s), all usable"
 fi
 rm -rf "$scratch" "$buildlog"
 
