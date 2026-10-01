@@ -64,4 +64,6 @@ does, which is collapsing conversation context.
 
 `poteto-agent` ships model-free and inherits your chat model. To pin it, add
 `model: "@poteto"` to the agent file and bind `poteto` in `modelRoles`. An unbound
-alias fails the spawn, so bind before you add. `/setup-pstack` walks through it.
+alias fails the spawn, so bind before you add. `/skill:setup-pstack` walks through it, since omp
+registers one slash command per skill as `/skill:<name>` and a bare `/setup-pstack` is not a
+command.
