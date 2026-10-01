@@ -74,8 +74,10 @@ apply_rules() {
 # Step 3, the port's own code. A patch that no longer applies is a hard stop, because the
 # alternative is shipping a tree that silently lost the port's behavior.
 apply_patches() {
+	# PATCH_DIR is overridable for the same reason RULES is: the mutation harness has to be able to
+	# feed the build a patch set that does not apply without editing the repository to do it.
 	local work="$1" p
-	for p in "$PORT_DIR"/patches/*.patch; do
+	for p in "${PATCH_DIR:-$PORT_DIR/patches}"/*.patch; do
 		[ -e "$p" ] || continue
 		patch -p1 -d "$work" --fuzz=0 --no-backup-if-mismatch <"$p" || return 1
 	done
