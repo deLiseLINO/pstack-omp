@@ -354,3 +354,30 @@ s#PR closes and retargets go through the stacker only\.#PR closes and retargets 
 # playbook this index points at.
 s#\*\*You own the merge frontier\. Declare a mode, clear one PR at a time, stop where the human's call begins\.\*\*#**You own the merge frontier. Name the watcher invocation, clear one PR at a time, stop where the human's call begins.**#
 s#Declare its mode before polling\.#Name its watcher invocation before polling.#
+
+## 11. Residual accuracy fixes. Each of these is a sentence that was wrong, incomplete, or
+## contradicted another sentence in the same tree. None is a Cursor residue; they are the port's
+## own claims about itself, which is the class nothing upstream can fix for us.
+
+# autopilot-stack grants --force-with-lease and base retarget but omits the one line its sibling
+# carries verbatim, so an agent reading only this playbook has licence to rewrite any branch in the
+# chain, including one a human pushed to.
+s#push with `--force-with-lease` only after an `ls-remote` check, and set the PR base to the parent branch\.#push with `--force-with-lease` only after an `ls-remote` check, and set the PR base to the parent branch. Never force-push a shared branch.#
+
+# shipping step 4 retargets a base with no consent clause, and step 7 re-runs steps 3-6 for every PR
+# in the stack, so an unguarded retarget here reaches the whole chain.
+s#4\. \*\*Prepare only the bottom PR\.\*\* Fetch current trunk\.#4. **Prepare only the bottom PR**, and retarget only on the operator's explicit go: an operator approval to land a PR is not approval to rewrite the base of every PR above it. Fetch current trunk.#
+
+# The autonomy sentence contradicted the pause-list scope added in section 10, and the index routes
+# "full autopilot" straight here, so the trigger phrase the operator types is the phrase that clause
+# disqualified.
+s#The operator's full-autonomy grant plus the root's clean verdict is the merge authorization that babysitting alone never has\.#A full-autonomy grant authorises the owner to keep working without checking in; the root's clean verdict authorises a merge only inside that grant. Neither is implied by "go faster", and both still require the operator to have armed PSTACK_LANDING_GRANT for the merge itself.#
+
+# `trash` is macOS, so the step could not be followed on this host, and the sentence forbade the one
+# fallback that would work. Handled in zz-live-runtime-routing.patch instead, because that line is
+# the patch's own output and a sed rule cannot see it.
+
+# The `or` put a hard reset on the same footing as a worktree, and the very next clause handled a
+# dirty branch safely. So the file knew the hazard and still offered the destructive branch first,
+# with no check between the two.
+s#or `git fetch && git reset --hard origin/<branch>` between them\.#or `git fetch && git reset --hard origin/<branch>` between them -- and only after `git status --porcelain` comes back empty, since the next clause is what you do when it does not.#
