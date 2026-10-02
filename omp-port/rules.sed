@@ -313,3 +313,44 @@ s#`/technical-writing`#`skill://technical-writing`#g
 # and checked by another could not satisfy both.
 s#Each returns `PASS`, `PASS\+NOTES` or `FAIL` and posts that verdict on its own PR\.#Each returns `PASS`, `ISSUES` or `BLOCKED`, the three verdicts `skill://pstack-omp` and **swarm** use, and posts that verdict on its own PR. Notes ride on a `PASS` rather than forming a fourth verdict, so a passing run with observations is still a pass.#
 s#stop at the first one without a passing verdict, where both `PASS` and `PASS\+NOTES` pass\.#stop at the first one whose verdict is not `PASS`.#
+
+## 10. Irreversible actions, and what the runtime actually enforces. Every replacement below
+## exists because the original either contradicted another sentence in the same tree, named a
+## surface omp does not have, or told an agent to do something the harness cannot stop. The
+## machine half is plugins/pstack/extensions/pstackpolicy, which refuses the forge mutations
+## unless the operator set PSTACK_LANDING_GRANT; prose alone cannot, because yolo auto-approves
+## the exec tier and every pstack owner is a headless subagent.
+
+# Landing is the one action the port routes a human toward and then never gated. The --auto branch
+# of this same step already carries "and the user asked"; the immediate branch did not, so an agent
+# reading step 5 alone had licence to merge under yolo with nothing to stop it.
+s#If the bottom PR is mergeable now, squash it with#Merge only on an explicit request. If the bottom PR is mergeable now and the user asked to land, ship, or merge it, squash it with#
+
+# The pause list is the port's only global gate and it omitted every forge action its own
+# autopilots perform, so those actions fell through it entirely.
+s#^\*\*Always pause\*\* for irreversible writes: force-push to shared branches, deploys, data deletion, customer messages\.$#**Always pause** for irreversible writes: pushing to trunk, merging a pull request, retargeting a pull request base, force-pushing a shared or trunk branch, closing a pull request, an issue, or a review thread, posting a review or review comment, resolving a review thread, deleting a branch on the forge, deploys, data deletion, customer messages.#
+
+# Two lines below an unqualified "keep going" reads as "do not pause". It is not; it is the
+# autonomy switch for reversible work.
+s#^\*\*Session overrides:\*\* "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going\.$#**Session overrides:** "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going on reversible work. They never waive the pause list above; a request to be autonomous is not authorisation to land.#
+
+# Granted an ungated push to trunk by the Roles section while the escalation list two pages later
+# omitted landing, so by the playbook's own rule the push never surfaced.
+s#Mechanically landing a verified unit \(fast-forward or clean cherry-pick of a worker's commit, then push\) is bookkeeping the coordinator may do itself on repos where local git is cheap\.#Mechanically landing a verified unit (fast-forward or clean cherry-pick of a worker's commit, then push to that unit's own branch) is bookkeeping the coordinator may do itself on repos where local git is cheap. Merging, or pushing to trunk, needs an operator landing grant recorded in the standing orders, exactly like any other irreversible write.#
+
+s#irreversible actions \(force-push to shared branches, deploys, deletions, closing someone else's PR\)#irreversible actions (pushing to trunk, merging, force-pushing a shared branch, retargeting a base, closing someone else's PR, issue, or review thread, posting a review, deploys, deletions)#
+
+# Seven columns, because that is what the runtime enforces. The thirteen below were prose the
+# store never wrote, so every `orch` command after following it failed on the header line.
+s#`units.tsv` has one row per unit: id, track, state, branch, PR, head SHA, brief path\.#`units.tsv` has one row per unit and exactly seven tab-separated columns, which is what `orch` enforces on the header and on every row: id, track, state, branch, pr, sha, brief. A ninth column is rejected, so do not add one.#
+
+# Mandatory, and the playbook never said so, so the first runtime step of any program aborted.
+s#2\. \*\*Install the runtime\.\*\* Run `orch init`\.#2. **Install the runtime.** Run `orch init --store <repo-dir>`; `--store`, or `ORCH_STORE`, is required and the command aborts without it.#
+
+# Routing through one writer is a constraint on who writes, not authorisation that they may.
+s#PR closes and retargets go through the stacker only\.#PR closes and retargets go through the stacker only, and only once the operator has approved that specific change; one writer is not consent.#
+
+# Leftover mode vocabulary. The four Cursor modes are gone, so naming one here contradicts the
+# playbook this index points at.
+s#\*\*You own the merge frontier\. Declare a mode, clear one PR at a time, stop where the human's call begins\.\*\*#**You own the merge frontier. Name the watcher invocation, clear one PR at a time, stop where the human's call begins.**#
+s#Declare its mode before polling\.#Name its watcher invocation before polling.#
