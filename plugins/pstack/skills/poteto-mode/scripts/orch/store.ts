@@ -974,6 +974,7 @@ interface GhPrRow {
   readonly baseRefName: string;
   readonly state: string;
   readonly createdAt: string;
+  readonly headRefOid: string;
 }
 
 // Roots are every pull request based on trunk, not one. This repository is the fixture: #10 is the
@@ -997,9 +998,9 @@ function ghPrList(repo: string): readonly GhPrRow[] {
         "--state",
         "all",
         "--limit",
-        "200",
+        "1000",
         "--json",
-        "number,headRefName,baseRefName,state,createdAt",
+        "number,headRefName,baseRefName,state,createdAt,headRefOid",
       ],
       {
         cwd: repo,
@@ -1020,7 +1021,7 @@ function ghPrList(repo: string): readonly GhPrRow[] {
   if (!Array.isArray(parsed)) {
     throw new UserError("gh pr list did not return an array");
   }
-  return parsed.map((row, index) => {
+  const rows = parsed.map((row, index) => {
     if (!isRecord(row)) {
       throw new UserError(`gh pr list row ${index + 1} is not an object`);
     }
@@ -1029,43 +1030,106 @@ function ghPrList(repo: string): readonly GhPrRow[] {
     const base = row["baseRefName"];
     const state = row["state"];
     const createdAt = row["createdAt"];
+    const oid = row["headRefOid"];
     if (
       typeof number !== "number" ||
       !Number.isSafeInteger(number) ||
       typeof head !== "string" ||
       typeof base !== "string" ||
       typeof state !== "string" ||
-      typeof createdAt !== "string"
+      typeof createdAt !== "string" ||
+      typeof oid !== "string"
     ) {
       throw new UserError(`gh pr list row ${index + 1} is missing a required field`);
     }
-    return { number, headRefName: head, baseRefName: base, state, createdAt };
+    // The head SHA comes from the forge, not from `git rev-parse` against a local branch. A merged
+    // or closed pull request whose branch was deleted locally would otherwise make the whole
+    // frontier throw, which is the normal state of a repository with any history in it.
+    if (!/^[0-9a-f]{40,64}$/i.test(oid)) {
+      throw new UserError(
+        `gh pr list row ${index + 1} has an unusable headRefOid ${JSON.stringify(oid)}`
+      );
+    }
+    return { number, headRefName: head, baseRefName: base, state, createdAt, headRefOid: oid };
   });
+  // A silent truncation here loses the tail of a stack and leaves a well-formed but wrong frontier,
+  // so hitting the cap is a failure rather than a warning.
+  if (rows.length >= 1000) {
+    throw new UserError(
+      "gh pr list returned 1000 pull requests, which is the requested limit; the stack order " +
+        "cannot be trusted because the tail was truncated"
+    );
+  }
+  return rows;
 }
 
-function frontierStateOf(state: string, number: number): FrontierPrState {
+function frontierStateOf(state: string, number: number): ForgePrState {
   if (state === "MERGED") return "MERGED";
   if (state === "CLOSED") return "CLOSED";
   if (state === "OPEN") return "OPEN";
   throw new UserError(`PR #${number} has an unrecognised state ${JSON.stringify(state)}`);
 }
 
-function ghFrontier(repo: string): readonly ForgeFrontierEntry[] {
-  const rows = ghPrList(repo);
-  if (rows.length === 0) {
-    return [];
+function ghFrontier(repo: string): readonly FrontierPr[] {
+  const all = ghPrList(repo);
+  if (all.length === 0) return [];
+
+  const byHead = new Map<string, GhPrRow>();
+  for (const row of all) {
+    // Two open pull requests on one head branch is ambiguous and cannot be ordered from the
+    // branch alone, so it is reported rather than silently taking one.
+    const existing = byHead.get(row.headRefName);
+    if (existing !== undefined && existing.state === "OPEN" && row.state === "OPEN") {
+      throw new UserError(
+        `two open pull requests share the head branch ${row.headRefName}: ` +
+          `#${existing.number} and #${row.number}`
+      );
+    }
+    byHead.set(row.headRefName, row);
   }
+
+  // Keep every open pull request, plus the closure of its downstack. The rest of the repository's
+  // history is not part of this stack, and including it made every command fail: an old pull
+  // request whose branch was merged away long ago has no path from trunk, which is not malformed.
+  const keep = new Set<number>();
+  const wanted = new Set<string>();
+  const walkDown = (branch: string, depth: number): void => {
+    if (depth > 200) {
+      throw new UserError(
+        `the downstack closure from ${branch} exceeded 200 pull requests; this looks cyclic`
+      );
+    }
+    const row = byHead.get(branch);
+    if (row === undefined || keep.has(row.number)) return;
+    keep.add(row.number);
+    walkDown(row.baseRefName, depth + 1);
+  };
+  for (const row of all) {
+    if (row.state === "OPEN") wanted.add(row.headRefName);
+  }
+  for (const head of wanted) walkDown(head, 0);
+
+  const rows = all.filter((row) => keep.has(row.number));
+
+  // Trunk is a base nobody branched a pull request head from. Derived from the list so it needs no
+  // second command and cannot disagree with what the forge reports. More than one candidate is
+  // reported rather than guessed: picking the first would depend on input order.
   const heads = new Set(rows.map((row) => row.headRefName));
-  // Trunk is the base nobody branches from into a pull request head. Derived from the list itself
-  // so it needs no extra command and cannot disagree with what the forge reports.
-  const trunk = [...new Set(rows.map((row) => row.baseRefName))]
+  const candidates = [...new Set(rows.map((row) => row.baseRefName))]
     .filter((base) => !heads.has(base))
-    .sort()[0];
-  if (trunk === undefined) {
+    .sort();
+  if (candidates.length === 0) {
     throw new UserError(
-      "could not determine the trunk branch: every base in the pull request list is also a head"
+      "could not determine the trunk branch: every base in the stack is also a pull request head"
     );
   }
+  if (candidates.length > 1) {
+    throw new UserError(
+      `the stack has more than one trunk candidate (${candidates.join(", ")}); ` +
+        "retarget the stray pull request or pass the trunk explicitly"
+    );
+  }
+  const trunk = candidates[0] as string;
 
   const childrenOf = new Map<string, GhPrRow[]>();
   for (const row of rows) {
@@ -1075,7 +1139,7 @@ function ghFrontier(repo: string): readonly ForgeFrontierEntry[] {
   }
   for (const bucket of childrenOf.values()) bucket.sort(ghFrontierOrder);
 
-  const ordered: ForgeFrontierEntry[] = [];
+  const ordered: FrontierPr[] = [];
   const seen = new Set<number>();
   const walk = (branch: string, path: readonly number[]): void => {
     for (const child of childrenOf.get(branch) ?? []) {
@@ -1091,6 +1155,7 @@ function ghFrontier(repo: string): readonly ForgeFrontierEntry[] {
       ordered.push({
         branches: child.headRefName,
         pr: child.number,
+        sha: child.headRefOid,
         state: frontierStateOf(child.state, child.number),
       });
       walk(child.headRefName, [...path, child.number]);
@@ -1101,7 +1166,8 @@ function ghFrontier(repo: string): readonly ForgeFrontierEntry[] {
   const unattached = rows.filter((row) => !seen.has(row.number));
   if (unattached.length > 0) {
     throw new UserError(
-      `malformed stack: ${unattached.length} pull request(s) are not reachable from ${trunk}: ` +
+      `malformed stack: ${unattached.length} pull request(s) in the closure are not reachable ` +
+        `from ${trunk}: ` +
         unattached
           .slice()
           .sort(ghFrontierOrder)
@@ -1112,38 +1178,8 @@ function ghFrontier(repo: string): readonly ForgeFrontierEntry[] {
   return ordered;
 }
 
-function branchSha({
-  branch,
-  repo,
-}: {
-  branch: string;
-  repo: string;
-}): string {
-  let raw: string;
-  try {
-    raw = execFileSync("git", ["rev-parse", branch], {
-      cwd: repo,
-      encoding: "utf8",
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (error) {
-    throw new UserError(
-      `git rev-parse ${branch} failed: ${errorMessage(error)}`
-    );
-  }
-  const sha = raw.trim();
-  if (!/^[0-9a-f]{40,64}$/i.test(sha)) {
-    throw new UserError(`git rev-parse ${branch} returned an invalid SHA`);
-  }
-  return sha;
-}
-
 function resolveFrontier(repo: string): readonly FrontierPr[] {
-  return ghFrontier(repo).map((row) => ({
-    ...row,
-    sha: branchSha({ branch: row.branches, repo }),
-  }));
+  return ghFrontier(repo);
 }
 
 function validateFrontierPin({
@@ -1165,10 +1201,10 @@ function validateFrontierPin({
   const extra = actual.filter((pr) => !expectedSet.has(pr));
   const drift: string[] = [];
   if (missing.length > 0) {
-    drift.push(`missing from gt: ${missing.join(",")}`);
+    drift.push(`missing from the remote: ${missing.join(",")}`);
   }
   if (extra.length > 0) {
-    drift.push(`extra in gt: ${extra.join(",")}`);
+    drift.push(`extra on the remote: ${extra.join(",")}`);
   }
   if (missing.length === 0 && extra.length === 0) {
     drift.push(

@@ -102,7 +102,7 @@ async function makeGitStack(directory: string): Promise<{
   };
 }
 
-async function withFakeGt<T>({
+async function withFakeGh<T>({
   directory,
   operation,
   output,
@@ -112,10 +112,10 @@ async function withFakeGt<T>({
   output: string;
 }): Promise<T> {
   const bin = join(directory, "bin");
-  const outputPath = join(directory, "gt-output.txt");
+  const outputPath = join(directory, "gh-output.json");
   await mkdir(bin);
   await writeFile(outputPath, output);
-  const gt = join(bin, "gt");
+  const gt = join(bin, "gh");
   await writeFile(
     gt,
     `#!/usr/bin/env bash
@@ -406,16 +406,16 @@ describe("Store", () => {
     ]);
   });
 
-  it("resolves the ordered Graphite frontier and validates an optional pin", async () => {
+  it("resolves the ordered frontier from base refs and validates an optional pin", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
-    const output = `◯ main
-◯ stack/merged
-◯ stack/closed
-◉ stack/open (current)
-`;
+    const output = JSON.stringify([
+      { number: 10, headRefName: "stack/merged", baseRefName: "main", state: "MERGED", createdAt: "2026-09-25T11:42:01Z", headRefOid: "a".repeat(40) },
+      { number: 11, headRefName: "stack/open", baseRefName: "stack/merged", state: "OPEN", createdAt: "2026-09-26T12:28:19Z", headRefOid: "b".repeat(40) },
+      { number: 13, headRefName: "stack/closed", baseRefName: "stack/merged", state: "CLOSED", createdAt: "2026-09-26T12:38:47Z", headRefOid: "c".repeat(40) },
+    ]);
 
-    await withFakeGt({
+    await withFakeGh({
       directory,
       output,
       operation: async () => {
@@ -425,19 +425,19 @@ describe("Store", () => {
             {
               pr: 10,
               branches: "stack/merged",
-              sha: stack.mergedSha,
+              sha: "a".repeat(40),
               state: "MERGED",
             },
             {
               pr: 13,
               branches: "stack/closed",
-              sha: stack.closedSha,
+              sha: "c".repeat(40),
               state: "CLOSED",
             },
             {
               pr: 11,
               branches: "stack/open",
-              sha: stack.openSha,
+              sha: "b".repeat(40),
               state: "OPEN",
             },
           ],
@@ -447,7 +447,7 @@ describe("Store", () => {
           (
             await store.frontier.set({
               repo: stack.repo,
-              prs: [10, 13, 11],
+              prs: [10, 11, 13],
             })
           ).generation
         ).toBe(2);
@@ -458,7 +458,7 @@ describe("Store", () => {
             prs: [10, 11, 12],
           })
         ).rejects.toThrow(
-          "frontier pin mismatch: missing from gt: 12; extra in gt: 13"
+          "frontier pin mismatch: missing from the remote: 12; extra on the remote: 13"
         );
         await expect(
           store.frontier.set({
@@ -466,7 +466,7 @@ describe("Store", () => {
             prs: [13, 10, 11],
           })
         ).rejects.toThrow(
-          "frontier pin mismatch: order differs: expected 13,10,11; gt 10,13,11"
+          "frontier pin mismatch: order differs: expected 13,10,11; remote 10,11,13"
         );
         await expect(
           store.frontier.set({
@@ -478,19 +478,17 @@ describe("Store", () => {
     });
   });
 
-  it("rejects unparseable Graphite output loudly", async () => {
+  it("rejects unparseable gh output loudly", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
 
-    await withFakeGt({
+    await withFakeGh({
       directory,
-      output: "◯ main\nthis line is not Graphite output\n",
+      output: "this is not json",
       operation: async () => {
         await expect(
           store.frontier.set({ repo: stack.repo })
-        ).rejects.toThrow(
-          'gt log short output has an unparseable line 2: "this line is not Graphite output"'
-        );
+        ).rejects.toThrow("gh pr list did not return JSON");
       },
     });
   });
