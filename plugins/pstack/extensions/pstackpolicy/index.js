@@ -58,12 +58,19 @@ const GH_FLAGS = String.raw`(?:\s+(?:-[A-Za-z]|[-]{2}[A-Za-z][\w-]*)(?:[= ]\S+)?
 // the flag it gates sits on the far side of the continuation.
 const CONT = String.raw`(?:[^\n\\]|\\\n)*`;
 
-// The shell hands gh its arguments with the quotes gone, so `gh "pr" merge 12` and
-// `gh 'pr' merge 12` are the same invocation as `gh pr merge 12`. Matching every verb against a
-// quote-stripped copy of the command is both shorter and stricter than carrying a quoted-word
-// alternative through each rule, and it catches a quoted subcommand the enumeration missed.
-// An unpaired quote is left alone; the shell would not run it either.
-const unquoted = (command) => command.replace(/(["'])([^"'\n]*)\1/g, "$2");
+// Two normalisations, because these rules match text and the text is not always a shell line.
+//
+// Quotes are syntax once the shell or the host language has read them, so `gh "pr" merge 12` is
+// `gh pr merge 12` and `'HEAD:main'` is one refspec. And inside an `eval` cell the command is
+// usually a list literal -- `subprocess.run(["git", "push", "origin", "HEAD:main"])`, or
+// `tool.bash({ command: "gh repo delete o/r --yes" })` -- where a comma and a bracket separate
+// what separated nothing in a shell line. Both are rewritten to a space. Only the loose direction
+// is taken: an unpaired quote is left alone, and a comma between two branch names becomes two
+// branch names, which this scan already treats as two refspecs.
+const normalize = (command) =>
+  command
+    .replace(/(["'])([^"'\n]*)\1\s*,?/g, "$2 ")
+    .replace(/[()[\]{},]/g, " ");
 
 const FORBIDDEN = [
   [
@@ -361,10 +368,11 @@ export default function pstackpolicy(pi) {
     if (!command) return;
     if (granted()) return;
 
+    const text = normalize(command);
     const why =
-      pushOffence(command) ??
-      (FORBIDDEN.find(([, pattern]) => pattern.test(unquoted(command))) ?? null)?.[0] ??
-      localDestruction(command);
+      pushOffence(text) ??
+      (FORBIDDEN.find(([, pattern]) => pattern.test(text)) ?? null)?.[0] ??
+      localDestruction(text);
 
     if (why) {
       return {
