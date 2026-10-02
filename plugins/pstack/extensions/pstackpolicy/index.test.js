@@ -25,6 +25,22 @@ async function run(command, env) {
 }
 
 const MUST_BLOCK = [
+  // The forms that defeated the first version of this file.
+  "gh --repo o/r pr merge 12 --squash",
+  "gh --repo o/r pr edit 12 --base main",
+  "gh --repo o/r pr review 12 --approve",
+  "gh --repo o/r issue close 5",
+  "git push origin HEAD:main",
+  "git push origin main:main",
+  "git push origin HEAD:refs/heads/main",
+  "git push origin +main",
+  "git push origin :feature/x",
+  "git push --mirror git@github.com:o/r.git",
+  "git update-ref refs/heads/main abc123",
+  'gh api graphql -f query=\'mutation{mergePullRequest(input:{pullRequestId:"x"}){clientMutationId}}\'',
+  "gh api -X PATCH repos/o/r/pulls/12 -f state=closed",
+  "gh api -X DELETE /repos/o/r/git/refs/heads/main",
+  // The forms it always caught.
   "gh pr merge 12 --squash --delete-branch",
   "gh pr merge 12 --squash --auto",
   "gh pr edit 12 --base main",
@@ -48,6 +64,13 @@ const MUST_PASS = [
   "git push --force-with-lease origin feature/x",
   "git status --porcelain",
   "bun run test",
+  "git push --force-with-lease origin feature/x",
+  "git push --force-with-lease origin main-menu",
+  "git push --force origin feature/main-menu",
+  "git commit -m \"merge main into feature\"",
+  "gh pr list --search main",
+  "git log main..HEAD",
+  "git push origin feature/x",
 ];
 
 describe("pstackpolicy", () => {
