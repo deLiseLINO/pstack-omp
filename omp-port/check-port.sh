@@ -72,6 +72,7 @@ stale_exempt_bad() {
 			gsub(/^[[:space:]]+|[[:space:]]+$/, "", f)
 			if (f !~ /[^[:space:]]/ || length(f) < 20)
 				printf "  rules.sed exemption fragment is blank or under 20 chars: [%s]\n", f
+		}
 	' "$STALE_ALLOW"
 }
 # The gate patterns live in omp-port/lib.sh, one source shared with the sync script.
