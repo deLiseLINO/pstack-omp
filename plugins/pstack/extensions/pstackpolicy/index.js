@@ -123,7 +123,11 @@ function pushOffence(command) {
         // A leading `+` is git's own force spelling, and the destination can still be trunk.
         const bareDest = token.replace(/^\+/, "").replace(/^refs\/heads\//, "");
         if (bareDest === "HEAD") return "pushing the current branch, which may be trunk";
-        if (TRUNK.has(bareDest)) return "rewriting history on a trunk branch";
+        if (TRUNK.has(bareDest)) {
+          return rest.some((t) => /^--force/.test(t) || t === "-f")
+            ? "rewriting history on a trunk branch"
+            : "pushing to trunk";
+        }
         continue;
       }
       sawRefspec = true;

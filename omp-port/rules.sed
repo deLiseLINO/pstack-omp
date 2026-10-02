@@ -381,3 +381,16 @@ s#The operator's full-autonomy grant plus the root's clean verdict is the merge 
 # dirty branch safely. So the file knew the hazard and still offered the destructive branch first,
 # with no check between the two.
 s#or `git fetch && git reset --hard origin/<branch>` between them\.#or `git fetch && git reset --hard origin/<branch>` between them -- and only after `git status --porcelain` comes back empty, since the next clause is what you do when it does not.#
+
+## 12. Graphite. Four playbooks said "Never require Graphite (`gt`)" while orchestrate made `gt`
+## the authoritative stack oracle and the store hard-errors without it. Only one of those can be
+## true, and the code is the one that decides what an agent experiences: `orch frontier` resolves
+## the stack through Graphite when it is installed and refuses to guess when it is not, and nothing
+## else in the port touches it. So `gt` is optional and never authoritative. These sentences now
+## say that, and no longer imply the port breaks without Graphite.
+
+s#Recompute `frontier.json` from `gt` after every merge and stack mutation because GitHub base refs drift mid-restack while gt tracking is authoritative: ordered PR list, branch names, head SHAs, a generation number, the lowest unmerged PR\.#Recompute `frontier.json` after every merge and stack mutation, because base refs drift mid-restack. `orch frontier` resolves the order from the forge's own PR base refs when it can, and refuses to guess rather than inventing an order when it cannot; record what it could not resolve instead. A pull request that is not reachable from trunk is reported as unattached rather than assumed to be in the stack.#
+
+
+s#- Workers never rebase and never run `gt`\.#- Workers never rebase and never touch stack topology.#
+
