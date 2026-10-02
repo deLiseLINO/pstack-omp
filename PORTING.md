@@ -348,3 +348,35 @@ own process environment. Refusals name the variable, so the operator is told exa
 A force push to a **feature** branch stays allowed: that is the port's own rebase flow, and blocking
 it would fail every stack owner mid-rebase and make the extension unusable without a grant. A force
 push that names a trunk ref is refused, which is the case the playbooks keep escalating.
+
+### Stack order without Graphite: the decision, before the code
+
+`orch frontier` resolves stack order through Graphite when it is installed and refuses to guess when
+it is not. The day that becomes `gh`, the order has to come from the forge's own PR base refs, and
+GitHub has no stacked-branch concept — so the algorithm has to reconstruct one. This repo's own open
+pull requests are the fixture that shows why the obvious version is wrong, so the decision is
+recorded here rather than left until the code exists.
+
+**The trap.** PR #10 → `main`, #12 → #10, #11 → #12, #14 → #11, and #13 → **#12 as well**. #13 is a
+sibling of #11, not a child of #14, and #13's own body calls it "safe to merge in any order", which
+the base chain does not encode. So:
+
+- The root set is **every PR whose base is trunk**, never a single root. A walk that starts at one
+  trunk and follows children terminates early or invents an order the repo does not have.
+- Children are linked by `baseRefName`, and a PR whose base names a branch with no open PR is
+  **reported unattached**, not guessed into the stack and not silently dropped.
+- Roots are ordered by `createdAt`, because that is the only ordering the forge itself asserts.
+- **Siblings need a deterministic tiebreak.** #11 and #13 share a base, and iterating a map or
+  following insertion order makes the frontier reorder between runs on identical input. Tiebreak on
+  **PR number ascending**, applied as a stable sort, so the order is a function of the input alone.
+- **The walk is cycle-guarded.** A retarget can point a PR's base back down its own chain; an
+  unguarded recursion hangs the coordinator. Carry a `seen` set of PR numbers and fail with a
+  malformed-stack error naming the repeat, rather than looping or emitting a partial order.
+
+**Test it against this repository's #10–#14**, not a synthetic single chain. The synthetic fixture
+is exactly the shape that hides both the sibling tiebreak and the multi-root case, which is why the
+real set is the one worth pinning.
+
+None of this is implemented yet. This section is the specification the implementation is checked
+against, so that a reviewer can reject an algorithm that does not produce a stable, cycle-safe,
+attaching-or-reported order for the real stack.

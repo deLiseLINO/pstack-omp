@@ -1,0 +1,310 @@
+diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scripts/orch/store.ts
+--- a/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 12:25:14.143978816 +0300
++++ b/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 12:25:14.144242291 +0300
+@@ -967,168 +967,149 @@
+     : entries.map(([name, count]) => `${name}=${count}`).join(", ");
+ }
+ 
+-const OPEN_GT_PR_STATUSES = new Set([
+-  "Trunk branch locked",
+-  "Changes requested",
+-  "Waiting on PRs in this stack to merge",
+-  "Waiting on downstack merge state",
+-  "Draft",
+-  "Required checks failed",
+-  "Undergoing failure detection",
+-  "Merge queue failed on current head commit",
+-  "Handed off to merge queue...",
+-  "Waiting on downstack",
+-  "Merge conflicts",
+-  "Needs reviewers",
+-  "Needs approvals",
+-  "Needs restack",
+-  "Queued to merge...",
+-  "Ready to merge",
+-  "Ready to merge as stack",
+-  "Rebasing...",
+-  "Waiting on CI...",
+-  "Stale, needs rebase onto trunk",
+-  "Unresolved comments",
+-  "Waiting on required CI",
+-  "Waiting to merge...",
+-]);
+ 
+-interface GtPullRequest {
+-  readonly pr: number;
+-  readonly state: FrontierPrState;
++interface GhPrRow {
++  readonly number: number;
++  readonly headRefName: string;
++  readonly baseRefName: string;
++  readonly state: string;
++  readonly createdAt: string;
+ }
+ 
+-interface GtFrontierEntry extends GtPullRequest {
+-  readonly branches: string;
++// Roots are every pull request based on trunk, not one. This repository is the fixture: #10 is the
++// only trunk base today, but #11 and #13 are siblings on #12's branch, so a walk that assumed a
++// single chain, or iterated a map, produced a different order between runs on identical input.
++function ghFrontierOrder(a: GhPrRow, b: GhPrRow): number {
++  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
++  // The deterministic tiebreak. Siblings are otherwise ordered by whatever the JSON happened to
++  // carry, which is not a function of the input alone.
++  return a.number - b.number;
+ }
+ 
+-function parseGtPullRequest({
+-  branch,
+-  detail,
+-}: {
+-  branch: string;
+-  detail: string;
+-}): GtPullRequest {
+-  const match =
+-    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?(?: .+)?$/.exec(
+-      detail
++function ghPrList(repo: string): readonly GhPrRow[] {
++  let raw: string;
++  try {
++    raw = execFileSync(
++      "gh",
++      [
++        "pr",
++        "list",
++        "--state",
++        "all",
++        "--limit",
++        "200",
++        "--json",
++        "number,headRefName,baseRefName,state,createdAt",
++      ],
++      {
++        cwd: repo,
++        encoding: "utf8",
++        env: { ...process.env, NO_COLOR: "1" },
++        stdio: ["ignore", "pipe", "pipe"],
++      }
+     );
+-  const pr = Number(match?.[1] ?? 0);
+-  if (match === null || !Number.isSafeInteger(pr)) {
+-    throw new UserError(
+-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
+-    );
++  } catch (error) {
++    throw new UserError(`gh pr list failed: ${errorMessage(error)}`);
+   }
+-  const status = match[2];
+-  if (status === "Merged") {
+-    return { pr, state: "MERGED" };
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(raw);
++  } catch {
++    throw new UserError("gh pr list did not return JSON");
+   }
+-  if (status === "Closed") {
+-    return { pr, state: "CLOSED" };
++  if (!Array.isArray(parsed)) {
++    throw new UserError("gh pr list did not return an array");
+   }
+-  if (status === undefined || OPEN_GT_PR_STATUSES.has(status)) {
+-    return { pr, state: "OPEN" };
+-  }
+-  throw new UserError(
+-    `gt info output has an unknown PR state for branch ${branch}: ${status}`
+-  );
+-}
+-
+-function parseGtBranches(raw: string): readonly string[] {
+-  const branches: string[] = [];
+-  const lines = raw.replace(/\r/g, "").split("\n");
+-  for (const [index, line] of lines.entries()) {
+-    if (line.length === 0) {
+-      continue;
++  return parsed.map((row, index) => {
++    if (!isRecord(row)) {
++      throw new UserError(`gh pr list row ${index + 1} is not an object`);
+     }
+-    const branchMatch =
+-      /^(?:│ )*[◯◉] +([^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
+-    if (branchMatch === null) {
+-      throw new UserError(
+-        `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`
+-      );
+-    }
+-    const branch = branchMatch[1] ?? "";
+-    if (branches.includes(branch)) {
+-      throw new UserError(
+-        `gt log short output contains duplicate branch ${branch}`
+-      );
++    const number = row["number"];
++    const head = row["headRefName"];
++    const base = row["baseRefName"];
++    const state = row["state"];
++    const createdAt = row["createdAt"];
++    if (
++      typeof number !== "number" ||
++      !Number.isSafeInteger(number) ||
++      typeof head !== "string" ||
++      typeof base !== "string" ||
++      typeof state !== "string" ||
++      typeof createdAt !== "string"
++    ) {
++      throw new UserError(`gh pr list row ${index + 1} is missing a required field`);
+     }
+-    branches.push(branch);
+-  }
+-  const trunk = branches[0];
+-  if (trunk === undefined) {
+-    throw new UserError("gt log short output did not contain a stack");
+-  }
+-  return branches.slice(1);
++    return { number, headRefName: head, baseRefName: base, state, createdAt };
++  });
+ }
+ 
+-function graphitePullRequest({
+-  branch,
+-  repo,
+-}: {
+-  branch: string;
+-  repo: string;
+-}): GtPullRequest {
+-  let raw: string;
+-  try {
+-    raw = execFileSync("gt", ["--no-interactive", "info", branch], {
+-      cwd: repo,
+-      encoding: "utf8",
+-      env: { ...process.env, NO_COLOR: "1" },
+-      stdio: ["ignore", "pipe", "pipe"],
+-    });
+-  } catch (error) {
+-    throw new UserError(
+-      `gt info ${branch} failed: ${errorMessage(error)}`
+-    );
+-  }
+-  const rows = raw
+-    .replace(/\r/g, "")
+-    .split("\n")
+-    .filter(
+-      (line) =>
+-        line.startsWith("PR #") || line.startsWith("[origin] PR #")
+-    );
++function frontierStateOf(state: string, number: number): FrontierPrState {
++  if (state === "MERGED") return "MERGED";
++  if (state === "CLOSED") return "CLOSED";
++  if (state === "OPEN") return "OPEN";
++  throw new UserError(`PR #${number} has an unrecognised state ${JSON.stringify(state)}`);
++}
++
++function ghFrontier(repo: string): readonly ForgeFrontierEntry[] {
++  const rows = ghPrList(repo);
+   if (rows.length === 0) {
+-    throw new UserError(
+-      `gt info output branch ${branch} has no pull request; this clone's gt metadata may predate the submit, so resolve the frontier from the stacker's clone or after gt sync`
+-    );
++    return [];
+   }
+-  if (rows.length > 1) {
++  const heads = new Set(rows.map((row) => row.headRefName));
++  // Trunk is the base nobody branches from into a pull request head. Derived from the list itself
++  // so it needs no extra command and cannot disagree with what the forge reports.
++  const trunk = [...new Set(rows.map((row) => row.baseRefName))]
++    .filter((base) => !heads.has(base))
++    .sort()[0];
++  if (trunk === undefined) {
+     throw new UserError(
+-      `gt info output contains multiple PRs for branch ${branch}`
++      "could not determine the trunk branch: every base in the pull request list is also a head"
+     );
+   }
+-  return parseGtPullRequest({ branch, detail: rows[0] ?? "" });
+-}
+ 
+-function graphiteFrontier(repo: string): readonly GtFrontierEntry[] {
+-  let raw: string;
+-  try {
+-    raw = execFileSync(
+-      "gt",
+-      ["--no-interactive", "log", "short", "--stack", "--reverse"],
+-      {
+-        cwd: repo,
+-        encoding: "utf8",
+-        env: { ...process.env, NO_COLOR: "1" },
+-        stdio: ["ignore", "pipe", "pipe"],
++  const childrenOf = new Map<string, GhPrRow[]>();
++  for (const row of rows) {
++    const bucket = childrenOf.get(row.baseRefName);
++    if (bucket === undefined) childrenOf.set(row.baseRefName, [row]);
++    else bucket.push(row);
++  }
++  for (const bucket of childrenOf.values()) bucket.sort(ghFrontierOrder);
++
++  const ordered: ForgeFrontierEntry[] = [];
++  const seen = new Set<number>();
++  const walk = (branch: string, path: readonly number[]): void => {
++    for (const child of childrenOf.get(branch) ?? []) {
++      // A retarget can point a base back down its own chain. Without this the walk loops forever
++      // and the coordinator hangs instead of reporting a bad stack.
++      if (seen.has(child.number)) {
++        throw new UserError(
++          `malformed stack: PR #${child.number} is reachable twice, via ` +
++            `${[...path, child.number].join(" -> ")}`
++        );
+       }
+-    );
+-  } catch (error) {
++      seen.add(child.number);
++      ordered.push({
++        branches: child.headRefName,
++        pr: child.number,
++        state: frontierStateOf(child.state, child.number),
++      });
++      walk(child.headRefName, [...path, child.number]);
++    }
++  };
++  walk(trunk, []);
++
++  const unattached = rows.filter((row) => !seen.has(row.number));
++  if (unattached.length > 0) {
+     throw new UserError(
+-      `gt log short --stack --reverse failed: ${errorMessage(error)}`
++      `malformed stack: ${unattached.length} pull request(s) are not reachable from ${trunk}: ` +
++        unattached
++          .slice()
++          .sort(ghFrontierOrder)
++          .map((row) => `#${row.number} (base ${row.baseRefName})`)
++          .join(", ")
+     );
+   }
+-  const result = parseGtBranches(raw).map((branch) => ({
+-    branches: branch,
+-    ...graphitePullRequest({ branch, repo }),
+-  }));
+-  if (new Set(result.map((row) => row.pr)).size !== result.length) {
+-    throw new UserError("gt info output contains duplicate pull requests");
+-  }
+-  return result;
++  return ordered;
+ }
+ 
+ function branchSha({
+@@ -1159,7 +1140,7 @@
+ }
+ 
+ function resolveFrontier(repo: string): readonly FrontierPr[] {
+-  return graphiteFrontier(repo).map((row) => ({
++  return ghFrontier(repo).map((row) => ({
+     ...row,
+     sha: branchSha({ branch: row.branches, repo }),
+   }));
+@@ -1191,7 +1172,7 @@
+   }
+   if (missing.length === 0 && extra.length === 0) {
+     drift.push(
+-      `order differs: expected ${expected.join(",")}; gt ${actual.join(",")}`
++      `order differs: expected ${expected.join(",")}; forge ${actual.join(",")}`
+     );
+   }
+   throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);
