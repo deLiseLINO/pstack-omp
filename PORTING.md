@@ -151,9 +151,10 @@ The marketplace install is the user shape.
 
 That caches the plugin at `~/.omp/plugins/cache/plugins/pstack-omp___pstack___<version>` and links
 it at the same `~/.omp/plugins/node_modules/pstack` path. Verified on omp 18.1.13, 2026-09-07. The
-skills load, `fan-out` and `setup-pstack` enter the `<skills>` block and the rest hide, and the
-`potetomode` extension loads from `package.json` `omp.extensions`, so `--poteto` injects the
-reminder in `-p` mode.
+skills load, `setup-pstack` is among them and the rest hide, and both extensions register from
+`package.json` `omp.extensions`, so `--poteto` injects the reminder in `-p` mode. `fan-out` is not
+one of this plugin's 49: it ships as a second plugin in the same marketplace and takes its own
+`/marketplace install fan-out@pstack-omp`.
 
 The agents do not load from a marketplace root. omp scans a marketplace plugin's `agents/` directory
 only through the `claude-plugins` discovery provider, which is off by default
@@ -241,10 +242,14 @@ The injected reminder is a pointer, not the playbook. It tells the agent to read
 - **`swarm` / `arena` / `interrogate`.** One `task` call with a `tasks[]` batch,
   `task.maxConcurrency=100`, `isolated: true` per candidate, `outputSchema` for judged verdicts.
 - **Never-block.** Subagents run `approvalMode: yolo`, so a worker cannot stop to ask. **Nothing
-  here vetoes a malformed subagent result.** The one extension this plugin ships is the mode pin,
-  and it registers no `session_stop`. What pstack relies on is the root's own acceptance discipline:
-  `skill://pstack-omp` requires the root to read each result and accept or reject it, and a
-  `judge`/`verifier` role is the independent check on a worker's claim. That is the whole backstop.
+  here vetoes a malformed subagent result.** The plugin ships two extensions, `potetomode` and
+  `pstackpolicy`, and neither one registers a `session_stop`; `pstackpolicy` vetoes at `tool_call`
+  and only for the forge mutations, so a result that is merely wrong still gets through. What
+  pstack relies on for that is the root's own acceptance discipline: `skill://pstack-omp` requires
+  the root to read each result and accept or reject it, and a `judge`/`verifier` role is the
+  independent check on a worker's claim. That is the whole backstop for a malformed result. Landing
+  is a separate gate and it is enforced in process rather than in prose; see
+  [What omp can actually stop](#what-omp-can-actually-stop) below.
   Returning `{"decision":"block"}` from `session_stop` is the one native veto contract, and
   `~/.omp/agent/extensions/proofgate/` implements it, dormant unless `$OMP_PROOF_FILE` is set, so
   treat the veto as absent unless you have verified that variable yourself. Its own `VERDICT.md`
