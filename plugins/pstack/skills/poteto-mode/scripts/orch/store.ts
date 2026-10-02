@@ -258,7 +258,7 @@ function errorMessage(error: unknown): string {
 // you do not have". Say which it is, and say what still works without it.
 function requireGt(): void {
   const probe = spawnSync("gt", ["--version"], { stdio: "ignore" });
-  if (probe.error === undefined || (probe.error as NodeJS.ErrnoException).code === "ENOENT") {
+  if (probe.error !== undefined) {
     throw new UserError(
       "gt was not found on PATH. The stacked frontier (orch frontier, and any command that reads " +
         "frontier.json from live PRs) resolves stack order through `gt log short --stack` and " +
