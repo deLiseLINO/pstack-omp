@@ -320,3 +320,31 @@ thinking id for judgment work.
   natively, both injectors will fire and collide, and the extension should be deleted or gated at
   that point. The same rule applies to every capability in this document. State the probe, not the
   version.
+
+### What omp can actually stop
+
+The playbooks say "stop where the human's call begins", and until recently that was advice with
+nothing behind it. Three facts from `omp://approval-mode.md`, on omp 18.4.10, decide what an
+instruction is worth here:
+
+- `yolo` auto-approves the `read`, `write`, **and `exec`** tiers. A `gh pr merge` inside a bash
+  call is an `exec` call, so it runs with no prompt.
+- Subagents run headless with `tools.approvalMode: yolo`, and "the parent `task` approval is the
+  authorization boundary". Every pstack owner is a subagent, so the boundary is the spawn, not the
+  instruction.
+- A call that resolves to `prompt` is **rejected** in a headless subagent, because there is no one
+  to answer it. A backstop therefore has to *refuse*, not prompt.
+
+bash's built-in critical-pattern list covers `rm -rf /`, fork bombs, remote-fetch-then-execute,
+`/etc/passwd`, and host shutdown. **A merge is not on it.** So is not a force-push to trunk, a base
+retarget, a PR close, or a review comment.
+
+That is why the port now ships `plugins/pstack/extensions/pstackpolicy`, a second extension beside
+the mode pin. It registers `tool_call` and refuses the forge mutations outright unless the operator
+set `PSTACK_LANDING_GRANT=1`. The grant is an environment variable rather than a flag or a slash
+command because a flag an agent can pass is not a grant a human made, and an agent cannot set its
+own process environment. Refusals name the variable, so the operator is told exactly what to set.
+
+A force push to a **feature** branch stays allowed: that is the port's own rebase flow, and blocking
+it would fail every stack owner mid-rebase and make the extension unusable without a grant. A force
+push that names a trunk ref is refused, which is the case the playbooks keep escalating.
