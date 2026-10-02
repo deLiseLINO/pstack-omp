@@ -68,6 +68,10 @@ stale_exempt_bad() {
 	[ -f "$STALE_ALLOW" ] || return 0
 	awk -F'\t' '
 		$0 !~ /^#/ {
+			# Only a genuinely empty line is not an entry. A line holding whitespace is one, and is
+			# caught below: that is the shape index() would match against every rule, so skipping it
+			# here would reinstate the exact hole this lint exists to close.
+			if ($0 == "") next
 			f = $1
 			gsub(/^[[:space:]]+|[[:space:]]+$/, "", f)
 			if (f !~ /[^[:space:]]/ || length(f) < 20)
