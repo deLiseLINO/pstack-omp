@@ -1168,7 +1168,7 @@ export function orderFrontier(rows: readonly GhPrRow[]): readonly FrontierPr[] {
   };
   walk(trunk, []);
 
-  const unattached = rows.filter((row) => !seen.has(row.number));
+  const unattached = stack.filter((row) => !seen.has(row.number));
   if (unattached.length > 0) {
     throw new UserError(
       `malformed stack: ${unattached.length} pull request(s) in the closure are not reachable ` +

@@ -1,0 +1,31 @@
+diff --git a/skills/poteto-mode/scripts/orch/orch.test.ts b/skills/poteto-mode/scripts/orch/orch.test.ts
+--- a/skills/poteto-mode/scripts/orch/orch.test.ts	2026-10-02 13:10:33.126960190 +0300
++++ b/skills/poteto-mode/scripts/orch/orch.test.ts	2026-10-02 13:10:33.127557389 +0300
+@@ -121,24 +121,15 @@
+     `#!/usr/bin/env bash
+ set -euo pipefail
+ if [ "$(pwd -P)" != "${realpathSync(join(directory, "repo"))}" ]; then
+-  printf 'gt ran outside the fixture repo: %s\\n' "$(pwd -P)" >&2
++  printf 'gh ran outside the fixture repo: %s\\n' "$(pwd -P)" >&2
+   exit 2
+ fi
+ case "$*" in
+-  "--no-interactive log short --stack --reverse")
++  "pr list --state all --limit 1000 --json number,headRefName,baseRefName,state,createdAt,headRefOid")
+     cat "${outputPath}"
+     ;;
+-  "--no-interactive info stack/merged")
+-    printf 'stack/merged\\nPR #10 (Merged) merged change\\n'
+-    ;;
+-  "--no-interactive info stack/closed")
+-    printf 'stack/closed\\nPR #13 (Closed) closed change\\n'
+-    ;;
+-  "--no-interactive info stack/open")
+-    printf 'stack/open\\nPR #11 (Needs approvals) open change\\n'
+-    ;;
+   *)
+-    printf 'unexpected gt arguments: %s\\n' "$*" >&2
++    printf 'unexpected gh arguments: %s\\n' "$*" >&2
+     exit 2
+     ;;
+ esac

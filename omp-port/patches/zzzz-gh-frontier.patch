@@ -1,6 +1,6 @@
 diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scripts/orch/store.ts
 --- a/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 12:59:30.439784060 +0300
-+++ b/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 13:01:02.887765023 +0300
++++ b/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 13:08:01.027889382 +0300
 @@ -967,202 +967,228 @@
      : entries.map(([name, count]) => `${name}=${count}`).join(", ");
  }
@@ -327,7 +327,7 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 +  };
 +  walk(trunk, []);
 +
-+  const unattached = rows.filter((row) => !seen.has(row.number));
++  const unattached = stack.filter((row) => !seen.has(row.number));
 +  if (unattached.length > 0) {
      throw new UserError(
 -      `gt log short --stack --reverse failed: ${errorMessage(error)}`

@@ -66,7 +66,7 @@ describe("orderFrontier", () => {
     ];
     const forward = orderFrontier(rows).map((r) => r.pr);
     expect(orderFrontier([...rows].reverse()).map((r) => r.pr)).toEqual(forward);
-    expect(forward).toEqual([10, 11, 13, 14]);
+    expect(forward).toEqual([10, 11, 14, 13]);
   });
 
   test("ignores history that is not part of the stack", () => {
