@@ -602,6 +602,26 @@ else
 	report "mechanics" "PASS  omp-mechanics installed and named in the reminder"
 fi
 
+# extensions/ sits outside SCOPE, so nothing else here would notice a control being unregistered.
+# That was verified by deleting the pstackpolicy entry from package.json: every test still passed
+# and the gate stayed green, because the tests import index.js directly and never read the
+# manifest. A backstop that can be switched off without anything noticing is not a backstop.
+unreg=""
+for ext in potetomode pstackpolicy; do
+	grep -qF "./extensions/$ext/index.js" package.json 2>/dev/null ||
+		unreg="${unreg}package.json does not register extensions/$ext/index.js"$'\n'
+	[ -f "extensions/$ext/index.js" ] ||
+		unreg="${unreg}extensions/$ext/index.js is missing"$'\n'
+done
+grep -qF 'PSTACK_LANDING_GRANT' extensions/pstackpolicy/index.js 2>/dev/null ||
+	unreg="${unreg}extensions/pstackpolicy no longer names PSTACK_LANDING_GRANT"$'\n'
+if [ -n "$unreg" ]; then
+	report "extensions" "FAIL"
+	while read -r u; do [ -n "$u" ] && violate "$u"; done <<<"$unreg"
+else
+	report "extensions" "PASS  both extensions present and registered"
+fi
+
 # The tree is build output. Rebuilding the pin has to reproduce it byte for byte outside the owned
 # paths, otherwise someone hand-edited a file the next sync will overwrite. That assertion is about
 # the checked-in tree, so it follows the pin and nothing else. The three assertions after it are
