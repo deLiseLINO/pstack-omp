@@ -1,0 +1,135 @@
+import { describe, expect, test } from "bun:test";
+import { orderFrontier } from "./store";
+
+// These tests pass pull requests in as plain objects. Nothing here stages a binary, asserts on a
+// subprocess's argv, or checks the working directory: the previous fixtures did all three, which
+// meant a test could fail because the mock disagreed with the call rather than because the order
+// was wrong. What follows is the behaviour that actually bites.
+//
+// The fixture throughout is this repository's own stack, because it is the shape that breaks the
+// obvious implementation: #10 is the only pull request based on trunk, #12 sits on #10, and #11 and
+// #13 are siblings on #12's branch. A walk that assumed one chain, or ordered siblings by whatever
+// the input happened to carry, produces a different answer here.
+
+const oid = (c: string): string => c.repeat(40);
+
+const pr = (
+  number: number,
+  headRefName: string,
+  baseRefName: string,
+  state: string,
+  day: number,
+  letter: string
+) => ({
+  number,
+  headRefName,
+  baseRefName,
+  state,
+  createdAt: `2026-09-${String(day).padStart(2, "0")}T00:00:00Z`,
+  headRefOid: oid(letter),
+});
+
+describe("orderFrontier", () => {
+  test("orders a stack by base refs, trunk first, and takes sha from the forge", () => {
+    const result = orderFrontier([
+      pr(10, "stack/merged", "main", "MERGED", 25, "a"),
+      pr(12, "stack/mid", "stack/merged", "MERGED", 26, "b"),
+      pr(11, "stack/open", "stack/mid", "OPEN", 27, "c"),
+    ]);
+    expect(result.map((r) => r.pr)).toEqual([10, 12, 11]);
+    expect(result.map((r) => r.sha)).toEqual([oid("a"), oid("b"), oid("c")]);
+    expect(result.map((r) => r.state)).toEqual(["MERGED", "MERGED", "OPEN"]);
+  });
+
+  test("orders siblings by createdAt, then by PR number when that ties", () => {
+    const tied = orderFrontier([
+      pr(10, "root", "main", "OPEN", 25, "a"),
+      pr(13, "later", "root", "OPEN", 25, "b"),
+      pr(11, "earlier", "root", "OPEN", 25, "c"),
+    ]);
+    expect(tied.map((r) => r.pr)).toEqual([10, 11, 13]);
+
+    const byTime = orderFrontier([
+      pr(10, "root", "main", "OPEN", 25, "a"),
+      pr(11, "early", "root", "OPEN", 26, "b"),
+      pr(13, "late", "root", "OPEN", 27, "c"),
+    ]);
+    expect(byTime.map((r) => r.pr)).toEqual([10, 11, 13]);
+  });
+
+  test("is stable: the same rows give the same order however they arrive", () => {
+    const rows = [
+      pr(10, "root", "main", "OPEN", 25, "a"),
+      pr(11, "early", "root", "OPEN", 26, "b"),
+      pr(13, "late", "root", "OPEN", 27, "c"),
+      pr(14, "child", "early", "OPEN", 28, "d"),
+    ];
+    const forward = orderFrontier(rows).map((r) => r.pr);
+    expect(orderFrontier([...rows].reverse()).map((r) => r.pr)).toEqual(forward);
+    expect(forward).toEqual([10, 11, 13, 14]);
+  });
+
+  test("ignores history that is not part of the stack", () => {
+    // The failure that made the first attempt worse than what it replaced. #90's branch was merged
+    // away long ago, so nothing bases on it and nothing descends from it. Not malformed: not this
+    // stack.
+    const result = orderFrontier([
+      pr(90, "ancient/branch", "ancient/base", "MERGED", 1, "z"),
+      pr(10, "root", "main", "OPEN", 25, "a"),
+      pr(11, "child", "root", "OPEN", 26, "b"),
+    ]);
+    expect(result.map((r) => r.pr)).toEqual([10, 11]);
+  });
+
+  test("keeps an open pull request's downstack even when that downstack is closed", () => {
+    const result = orderFrontier([
+      pr(10, "root", "main", "MERGED", 25, "a"),
+      pr(11, "child", "root", "CLOSED", 26, "b"),
+      pr(12, "grandchild", "child", "OPEN", 27, "c"),
+    ]);
+    expect(result.map((r) => r.pr)).toEqual([10, 11, 12]);
+  });
+
+  test("rejects a cycle instead of looping forever", () => {
+    expect(() =>
+      orderFrontier([
+        pr(20, "loop/a", "loop/b", "OPEN", 25, "a"),
+        pr(21, "loop/b", "loop/a", "OPEN", 26, "b"),
+      ])
+    ).toThrow();
+  });
+
+  test("reports a pull request whose base is not in the stack", () => {
+    expect(() =>
+      orderFrontier([
+        pr(10, "root", "main", "OPEN", 25, "a"),
+        pr(30, "stray", "gone/branch", "OPEN", 26, "b"),
+      ])
+    ).toThrow();
+  });
+
+  test("refuses to guess when more than one branch could be trunk", () => {
+    expect(() =>
+      orderFrontier([
+        pr(10, "root", "main", "OPEN", 25, "a"),
+        pr(11, "child", "root", "OPEN", 26, "b"),
+        pr(20, "other", "release", "OPEN", 27, "c"),
+        pr(21, "other/child", "other", "OPEN", 28, "d"),
+      ])
+    ).toThrow(/trunk/i);
+  });
+
+  test("rejects two open pull requests on one head branch", () => {
+    expect(() =>
+      orderFrontier([
+        pr(10, "root", "main", "OPEN", 25, "a"),
+        pr(11, "shared", "root", "OPEN", 26, "b"),
+        pr(12, "shared", "root", "OPEN", 27, "c"),
+      ])
+    ).toThrow();
+  });
+
+  test("an empty stack is an empty stack", () => {
+    expect(orderFrontier([])).toEqual([]);
+  });
+});

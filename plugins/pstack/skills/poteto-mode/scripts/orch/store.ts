@@ -1070,9 +1070,14 @@ function frontierStateOf(state: string, number: number): ForgePrState {
   throw new UserError(`PR #${number} has an unrecognised state ${JSON.stringify(state)}`);
 }
 
-function ghFrontier(repo: string): readonly FrontierPr[] {
-  const all = ghPrList(repo);
-  if (all.length === 0) return [];
+// The pure half of the frontier walk: given what the forge reported, what is the order. Kept free of
+// any subprocess so it can be tested against the cases that actually bite -- sibling ordering,
+// a cycle, an unreachable pull request, trunk ambiguity, and a repository whose history is not
+// part of the stack -- without a fake binary on PATH asserting its own argv.
+export function orderFrontier(rows: readonly GhPrRow[]): readonly FrontierPr[] {
+  const all = rows;
+  void all;
+  if (rows.length === 0) return [];
 
   const byHead = new Map<string, GhPrRow>();
   for (const row of all) {
@@ -1109,13 +1114,13 @@ function ghFrontier(repo: string): readonly FrontierPr[] {
   }
   for (const head of wanted) walkDown(head, 0);
 
-  const rows = all.filter((row) => keep.has(row.number));
+  const stack = all.filter((row) => keep.has(row.number));
 
   // Trunk is a base nobody branched a pull request head from. Derived from the list so it needs no
   // second command and cannot disagree with what the forge reports. More than one candidate is
   // reported rather than guessed: picking the first would depend on input order.
-  const heads = new Set(rows.map((row) => row.headRefName));
-  const candidates = [...new Set(rows.map((row) => row.baseRefName))]
+  const heads = new Set(stack.map((row) => row.headRefName));
+  const candidates = [...new Set(stack.map((row) => row.baseRefName))]
     .filter((base) => !heads.has(base))
     .sort();
   if (candidates.length === 0) {
@@ -1132,7 +1137,7 @@ function ghFrontier(repo: string): readonly FrontierPr[] {
   const trunk = candidates[0] as string;
 
   const childrenOf = new Map<string, GhPrRow[]>();
-  for (const row of rows) {
+  for (const row of stack) {
     const bucket = childrenOf.get(row.baseRefName);
     if (bucket === undefined) childrenOf.set(row.baseRefName, [row]);
     else bucket.push(row);
@@ -1176,6 +1181,10 @@ function ghFrontier(repo: string): readonly FrontierPr[] {
     );
   }
   return ordered;
+}
+
+function ghFrontier(repo: string): readonly FrontierPr[] {
+  return orderFrontier(ghPrList(repo));
 }
 
 function resolveFrontier(repo: string): readonly FrontierPr[] {
@@ -1273,21 +1282,21 @@ export function openStore(
               ? ""
               : requiredCell(params.brief, "brief"),
         };
-        const rows = [...(await readUnits(store))];
+        const stack = [...(await readUnits(store))];
         if (rows.some((unit) => unit.id === row.id)) {
           throw new UserError(`unit ${row.id} already exists`);
         }
         rows.push(row);
-        await saveUnits(store, rows);
+        await saveUnits(store, stack);
         return row;
       },
       set: async (params) => {
         await beginWrite();
         const id = requiredCell(params.id, "unit id");
         const state = requiredCell(params.state, "state");
-        const rows = [...(await readUnits(store))];
+        const stack = [...(await readUnits(store))];
         const index = rows.findIndex((unit) => unit.id === id);
-        const old = rows[index];
+        const old = stack[index];
         if (index < 0 || old === undefined) {
           throw new NotFoundError(`unit ${id} not found`);
         }
@@ -1307,8 +1316,8 @@ export function openStore(
               ? old.sha
               : requiredCell(params.sha, "SHA"),
         };
-        rows[index] = row;
-        await saveUnits(store, rows);
+        stack[index] = row;
+        await saveUnits(store, stack);
         return row;
       },
       get: async (id) => {
@@ -1360,16 +1369,16 @@ export function openStore(
               : requiredCell(params.verifier, "verifier"),
           ts: new Date().toISOString(),
         };
-        const rows = [...(await readLedger(store))];
+        const stack = [...(await readLedger(store))];
         const index = rows.findIndex(
           (old) => old.pr === row.pr && old.sha === row.sha
         );
         if (index < 0) {
           rows.push(row);
         } else {
-          rows[index] = row;
+          stack[index] = row;
         }
-        await saveLedger(store, rows);
+        await saveLedger(store, stack);
         return row;
       },
       check: async (params) => {
@@ -1422,7 +1431,7 @@ export function openStore(
       drain: async () => {
         await beginWrite();
         const inbox = join(store, "inbox");
-        const rows = await readPointers(inbox);
+        const stack = await readPointers(inbox);
         const drained = join(
           store,
           `.inbox-drain-${process.pid}-${randomUUID()}`
@@ -1435,7 +1444,7 @@ export function openStore(
           throw error;
         }
         await rm(drained, { recursive: true, force: true });
-        return rows;
+        return stack;
       },
       peek: async () => {
         ensureOpen();
@@ -1459,14 +1468,14 @@ export function openStore(
             "default"
           ),
         };
-        const rows = [...(await readGates(store))];
+        const stack = [...(await readGates(store))];
         const index = rows.findIndex((old) => old.id === gate.id);
         if (index < 0) {
           rows.push(gate);
         } else {
-          rows[index] = gate;
+          stack[index] = gate;
         }
-        await atomicWrite(join(store, "gates.md"), renderGates(rows));
+        await atomicWrite(join(store, "gates.md"), renderGates(stack));
         return gate;
       },
       list: async () => {
@@ -1478,9 +1487,9 @@ export function openStore(
       resolve: async (params) => {
         await beginWrite();
         const id = requiredLine(params.id, "gate id");
-        const rows = [...(await readGates(store))];
+        const stack = [...(await readGates(store))];
         const index = rows.findIndex((gate) => gate.id === id);
-        const old = rows[index];
+        const old = stack[index];
         if (index < 0 || old === undefined) {
           throw new NotFoundError(`gate ${id} not found`);
         }
@@ -1492,8 +1501,8 @@ export function openStore(
           defaultAnswer: old.defaultAnswer,
           answer: requiredLine(params.answer, "answer"),
         };
-        rows[index] = gate;
-        await atomicWrite(join(store, "gates.md"), renderGates(rows));
+        stack[index] = gate;
+        await atomicWrite(join(store, "gates.md"), renderGates(stack));
         return gate;
       },
     },
@@ -1539,7 +1548,7 @@ export function openStore(
       },
       add: async (params) => {
         await beginWrite();
-        const rows = [...(await readStanding(store))];
+        const stack = [...(await readStanding(store))];
         const item: StandingLine = {
           number: rows.length + 1,
           line: requiredLine(params.line, "standing order"),

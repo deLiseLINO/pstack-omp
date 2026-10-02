@@ -1,7 +1,7 @@
 diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scripts/orch/store.ts
---- a/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 12:50:32.873113194 +0300
-+++ b/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 12:50:32.873418679 +0300
-@@ -967,202 +967,219 @@
+--- a/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 12:59:30.439784060 +0300
++++ b/skills/poteto-mode/scripts/orch/store.ts	2026-10-02 13:01:02.887765023 +0300
+@@ -967,202 +967,228 @@
      : entries.map(([name, count]) => `${name}=${count}`).join(", ");
  }
  
@@ -154,6 +154,13 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 -    `gt info output has an unknown PR state for branch ${branch}: ${status}`
 -  );
 +  return rows;
++}
++
++function frontierStateOf(state: string, number: number): ForgePrState {
++  if (state === "MERGED") return "MERGED";
++  if (state === "CLOSED") return "CLOSED";
++  if (state === "OPEN") return "OPEN";
++  throw new UserError(`PR #${number} has an unrecognised state ${JSON.stringify(state)}`);
  }
  
 -function parseGtBranches(raw: string): readonly string[] {
@@ -166,16 +173,14 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 -    const branchMatch =
 -      /^(?:│ )*[◯◉] +([^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
 -    if (branchMatch === null) {
-+function frontierStateOf(state: string, number: number): ForgePrState {
-+  if (state === "MERGED") return "MERGED";
-+  if (state === "CLOSED") return "CLOSED";
-+  if (state === "OPEN") return "OPEN";
-+  throw new UserError(`PR #${number} has an unrecognised state ${JSON.stringify(state)}`);
-+}
-+
-+function ghFrontier(repo: string): readonly FrontierPr[] {
-+  const all = ghPrList(repo);
-+  if (all.length === 0) return [];
++// The pure half of the frontier walk: given what the forge reported, what is the order. Kept free of
++// any subprocess so it can be tested against the cases that actually bite -- sibling ordering,
++// a cycle, an unreachable pull request, trunk ambiguity, and a repository whose history is not
++// part of the stack -- without a fake binary on PATH asserting its own argv.
++export function orderFrontier(rows: readonly GhPrRow[]): readonly FrontierPr[] {
++  const all = rows;
++  void all;
++  if (rows.length === 0) return [];
 +
 +  const byHead = new Map<string, GhPrRow>();
 +  for (const row of all) {
@@ -207,10 +212,6 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
        );
      }
 -    branches.push(branch);
--  }
--  const trunk = branches[0];
--  if (trunk === undefined) {
--    throw new UserError("gt log short output did not contain a stack");
 +    const row = byHead.get(branch);
 +    if (row === undefined || keep.has(row.number)) return;
 +    keep.add(row.number);
@@ -219,9 +220,15 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 +  for (const row of all) {
 +    if (row.state === "OPEN") wanted.add(row.headRefName);
    }
+-  const trunk = branches[0];
+-  if (trunk === undefined) {
+-    throw new UserError("gt log short output did not contain a stack");
+-  }
 -  return branches.slice(1);
 -}
 +  for (const head of wanted) walkDown(head, 0);
++
++  const stack = all.filter((row) => keep.has(row.number));
  
 -function graphitePullRequest({
 -  branch,
@@ -239,13 +246,11 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 -      stdio: ["ignore", "pipe", "pipe"],
 -    });
 -  } catch (error) {
-+  const rows = all.filter((row) => keep.has(row.number));
-+
 +  // Trunk is a base nobody branched a pull request head from. Derived from the list so it needs no
 +  // second command and cannot disagree with what the forge reports. More than one candidate is
 +  // reported rather than guessed: picking the first would depend on input order.
-+  const heads = new Set(rows.map((row) => row.headRefName));
-+  const candidates = [...new Set(rows.map((row) => row.baseRefName))]
++  const heads = new Set(stack.map((row) => row.headRefName));
++  const candidates = [...new Set(stack.map((row) => row.baseRefName))]
 +    .filter((base) => !heads.has(base))
 +    .sort();
 +  if (candidates.length === 0) {
@@ -276,7 +281,7 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 +  const trunk = candidates[0] as string;
 +
 +  const childrenOf = new Map<string, GhPrRow[]>();
-+  for (const row of rows) {
++  for (const row of stack) {
 +    const bucket = childrenOf.get(row.baseRefName);
 +    if (bucket === undefined) childrenOf.set(row.baseRefName, [row]);
 +    else bucket.push(row);
@@ -310,19 +315,6 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
        }
 -    );
 -  } catch (error) {
--    throw new UserError(
--      `gt log short --stack --reverse failed: ${errorMessage(error)}`
--    );
--  }
--  const result = parseGtBranches(raw).map((branch) => ({
--    branches: branch,
--    ...graphitePullRequest({ branch, repo }),
--  }));
--  if (new Set(result.map((row) => row.pr)).size !== result.length) {
--    throw new UserError("gt info output contains duplicate pull requests");
--  }
--  return result;
--}
 +      seen.add(child.number);
 +      ordered.push({
 +        branches: child.headRefName,
@@ -334,6 +326,30 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 +    }
 +  };
 +  walk(trunk, []);
++
++  const unattached = rows.filter((row) => !seen.has(row.number));
++  if (unattached.length > 0) {
+     throw new UserError(
+-      `gt log short --stack --reverse failed: ${errorMessage(error)}`
++      `malformed stack: ${unattached.length} pull request(s) in the closure are not reachable ` +
++        `from ${trunk}: ` +
++        unattached
++          .slice()
++          .sort(ghFrontierOrder)
++          .map((row) => `#${row.number} (base ${row.baseRefName})`)
++          .join(", ")
+     );
+   }
+-  const result = parseGtBranches(raw).map((branch) => ({
+-    branches: branch,
+-    ...graphitePullRequest({ branch, repo }),
+-  }));
+-  if (new Set(result.map((row) => row.pr)).size !== result.length) {
+-    throw new UserError("gt info output contains duplicate pull requests");
+-  }
+-  return result;
++  return ordered;
+ }
  
 -function branchSha({
 -  branch,
@@ -351,25 +367,17 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
 -      stdio: ["ignore", "pipe", "pipe"],
 -    });
 -  } catch (error) {
-+  const unattached = rows.filter((row) => !seen.has(row.number));
-+  if (unattached.length > 0) {
-     throw new UserError(
+-    throw new UserError(
 -      `git rev-parse ${branch} failed: ${errorMessage(error)}`
-+      `malformed stack: ${unattached.length} pull request(s) in the closure are not reachable ` +
-+        `from ${trunk}: ` +
-+        unattached
-+          .slice()
-+          .sort(ghFrontierOrder)
-+          .map((row) => `#${row.number} (base ${row.baseRefName})`)
-+          .join(", ")
-     );
-   }
+-    );
+-  }
 -  const sha = raw.trim();
 -  if (!/^[0-9a-f]{40,64}$/i.test(sha)) {
 -    throw new UserError(`git rev-parse ${branch} returned an invalid SHA`);
 -  }
 -  return sha;
-+  return ordered;
++function ghFrontier(repo: string): readonly FrontierPr[] {
++  return orderFrontier(ghPrList(repo));
  }
  
  function resolveFrontier(repo: string): readonly FrontierPr[] {
@@ -381,7 +389,7 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
  }
  
  function validateFrontierPin({
-@@ -1184,14 +1201,14 @@
+@@ -1184,14 +1210,14 @@
    const extra = actual.filter((pr) => !expectedSet.has(pr));
    const drift: string[] = [];
    if (missing.length > 0) {
@@ -399,3 +407,128 @@ diff --git a/skills/poteto-mode/scripts/orch/store.ts b/skills/poteto-mode/scrip
      );
    }
    throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);
+@@ -1256,21 +1282,21 @@
+               ? ""
+               : requiredCell(params.brief, "brief"),
+         };
+-        const rows = [...(await readUnits(store))];
++        const stack = [...(await readUnits(store))];
+         if (rows.some((unit) => unit.id === row.id)) {
+           throw new UserError(`unit ${row.id} already exists`);
+         }
+         rows.push(row);
+-        await saveUnits(store, rows);
++        await saveUnits(store, stack);
+         return row;
+       },
+       set: async (params) => {
+         await beginWrite();
+         const id = requiredCell(params.id, "unit id");
+         const state = requiredCell(params.state, "state");
+-        const rows = [...(await readUnits(store))];
++        const stack = [...(await readUnits(store))];
+         const index = rows.findIndex((unit) => unit.id === id);
+-        const old = rows[index];
++        const old = stack[index];
+         if (index < 0 || old === undefined) {
+           throw new NotFoundError(`unit ${id} not found`);
+         }
+@@ -1290,8 +1316,8 @@
+               ? old.sha
+               : requiredCell(params.sha, "SHA"),
+         };
+-        rows[index] = row;
+-        await saveUnits(store, rows);
++        stack[index] = row;
++        await saveUnits(store, stack);
+         return row;
+       },
+       get: async (id) => {
+@@ -1343,16 +1369,16 @@
+               : requiredCell(params.verifier, "verifier"),
+           ts: new Date().toISOString(),
+         };
+-        const rows = [...(await readLedger(store))];
++        const stack = [...(await readLedger(store))];
+         const index = rows.findIndex(
+           (old) => old.pr === row.pr && old.sha === row.sha
+         );
+         if (index < 0) {
+           rows.push(row);
+         } else {
+-          rows[index] = row;
++          stack[index] = row;
+         }
+-        await saveLedger(store, rows);
++        await saveLedger(store, stack);
+         return row;
+       },
+       check: async (params) => {
+@@ -1405,7 +1431,7 @@
+       drain: async () => {
+         await beginWrite();
+         const inbox = join(store, "inbox");
+-        const rows = await readPointers(inbox);
++        const stack = await readPointers(inbox);
+         const drained = join(
+           store,
+           `.inbox-drain-${process.pid}-${randomUUID()}`
+@@ -1418,7 +1444,7 @@
+           throw error;
+         }
+         await rm(drained, { recursive: true, force: true });
+-        return rows;
++        return stack;
+       },
+       peek: async () => {
+         ensureOpen();
+@@ -1442,14 +1468,14 @@
+             "default"
+           ),
+         };
+-        const rows = [...(await readGates(store))];
++        const stack = [...(await readGates(store))];
+         const index = rows.findIndex((old) => old.id === gate.id);
+         if (index < 0) {
+           rows.push(gate);
+         } else {
+-          rows[index] = gate;
++          stack[index] = gate;
+         }
+-        await atomicWrite(join(store, "gates.md"), renderGates(rows));
++        await atomicWrite(join(store, "gates.md"), renderGates(stack));
+         return gate;
+       },
+       list: async () => {
+@@ -1461,9 +1487,9 @@
+       resolve: async (params) => {
+         await beginWrite();
+         const id = requiredLine(params.id, "gate id");
+-        const rows = [...(await readGates(store))];
++        const stack = [...(await readGates(store))];
+         const index = rows.findIndex((gate) => gate.id === id);
+-        const old = rows[index];
++        const old = stack[index];
+         if (index < 0 || old === undefined) {
+           throw new NotFoundError(`gate ${id} not found`);
+         }
+@@ -1475,8 +1501,8 @@
+           defaultAnswer: old.defaultAnswer,
+           answer: requiredLine(params.answer, "answer"),
+         };
+-        rows[index] = gate;
+-        await atomicWrite(join(store, "gates.md"), renderGates(rows));
++        stack[index] = gate;
++        await atomicWrite(join(store, "gates.md"), renderGates(stack));
+         return gate;
+       },
+     },
+@@ -1522,7 +1548,7 @@
+       },
+       add: async (params) => {
+         await beginWrite();
+-        const rows = [...(await readStanding(store))];
++        const stack = [...(await readStanding(store))];
+         const item: StandingLine = {
+           number: rows.length + 1,
+           line: requiredLine(params.line, "standing order"),
