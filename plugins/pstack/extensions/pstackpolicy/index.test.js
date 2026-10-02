@@ -25,6 +25,17 @@ async function run(command, env) {
 }
 
 const MUST_BLOCK = [
+  // A refspec this port cannot read is not a refspec. `git push origin HEAD` and a bare
+  // `git push` land on whatever the checkout is on, which from a trunk checkout is trunk, and a
+  // quoted refspec hid the destination from the colon split.
+  "git push origin HEAD",
+  "git push",
+  "git push origin",
+  "git push --force origin",
+  "git push origin 'HEAD:main'",
+  "gh pr edit 12 \\\n  --base main",
+  "gh pr merge 12 \\\n  --auto",
+  "gh --repo o/r pr merge 12 \\\n  --squash",
   // The forms that defeated the first version of this file.
   "gh --repo o/r pr merge 12 --squash",
   "gh --repo o/r pr edit 12 --base main",

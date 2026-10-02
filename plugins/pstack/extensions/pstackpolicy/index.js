@@ -36,6 +36,11 @@ const TRUNK = new Set(["main", "master", "trunk", "develop", "release"]);
 // `--repo owner/name`, which is the form the port actually uses.
 const GH_FLAGS = String.raw`(?:\s+(?:-[A-Za-z]|[-]{2}[A-Za-z][\w-]*)(?:[= ]\S+)?)*`;
 
+// Any run of characters that is not a newline, except a backslash immediately followed by one. A
+// plain `[^\n]*` let `gh pr edit 12 \` + newline + `--base main` past every flag rule, because
+// the flag it gates sits on the far side of the continuation.
+const CONT = String.raw`(?:[^\n\\]|\\\n)*`;
+
 const FORBIDDEN = [
   [
     "merging a pull request",
@@ -44,28 +49,28 @@ const FORBIDDEN = [
   [
     "merging a pull request through the API",
     new RegExp(
-      String.raw`\bgh\b${GH_FLAGS}\s+api\b[^\n]*(?:\/pulls\/\d+\/merge|mergePullRequest|\/merge\b)`
+      String.raw`\bgh\b${GH_FLAGS}\s+api\b${CONT}(?:\/pulls\/\d+\/merge|mergePullRequest|\/merge\b)`
     ),
   ],
   [
     "closing, reopening, or deleting a pull request, issue, or thread",
     new RegExp(
-      String.raw`\bgh\b${GH_FLAGS}\s+(pr|issue)\s+(close|reopen|delete)\b|\bgh\b${GH_FLAGS}\s+api\b[^\n]*(?:-X\s*DELETE[^\n]*\/(issues|pulls|git\/refs)|state\s*=\s*closed|closePullRequest|closeIssue)`
+      String.raw`\bgh\b${GH_FLAGS}\s+(pr|issue)\s+(close|reopen|delete)\b|\bgh\b${GH_FLAGS}\s+api\b${CONT}(?:-X\s*DELETE[^\n]*\/(issues|pulls|git\/refs)|state\s*=\s*closed|closePullRequest|closeIssue)`
     ),
   ],
   [
     "retargeting a pull request base, which rewrites the whole stack under it",
-    new RegExp(String.raw`\bgh\b${GH_FLAGS}\s+pr\s+edit\b[^\n]*--base\b`),
+    new RegExp(String.raw`\bgh\b${GH_FLAGS}\s+pr\s+edit\b${CONT}--base\b`),
   ],
   [
     "posting a review or resolving a review thread",
     new RegExp(
-      String.raw`\bgh\b${GH_FLAGS}\s+pr\s+review\b|\bgh\b${GH_FLAGS}\s+api\b[^\n]*(?:-X\s*POST[^\n]*(?:\/reviews|pulls\/\d+\/(comments|reviews))|resolveReviewThread|addPullRequestReview)`
+      String.raw`\bgh\b${GH_FLAGS}\s+pr\s+review\b|\bgh\b${GH_FLAGS}\s+api\b${CONT}(?:-X\s*POST[^\n]*(?:\/reviews|pulls\/\d+\/(comments|reviews))|resolveReviewThread|addPullRequestReview)`
     ),
   ],
   [
     "armoring merge-when-ready",
-    new RegExp(String.raw`\bgh\b${GH_FLAGS}\s+pr\s+merge\b[^\n]*--(?:auto|auto-merge)\b`),
+    new RegExp(String.raw`\bgh\b${GH_FLAGS}\s+pr\s+merge\b${CONT}--(?:auto|auto-merge)\b`),
   ],
   [
     "merging through Graphite",
@@ -95,11 +100,34 @@ function pushOffence(command) {
       return "pushing every ref, or mirroring the whole repository, at the remote";
     }
     if (rest.includes("--delete")) return "deleting a branch on the forge";
-    for (const token of rest) {
+    let sawRefspec = false;
+    // The first bare, colon-free, non-HEAD token is the remote name, not a refspec. Counting it as
+    // one made `git push origin` look like a push with a destination.
+    const bare = rest
+      .map((t) => t.replace(/^["']|["']$/g, ""))
+      .filter((t) => !t.startsWith("-"));
+    let remoteSeen = bare.length === 0 || bare[0].includes(":") || bare[0] === "HEAD";
+    for (const raw of rest) {
       // `:branch` is git's refspec delete form; it carries no --delete flag.
+      const token = raw.replace(/^["']|["']$/g, "");
       if (token.startsWith(":")) return "deleting a branch on the forge";
-      const afterColon = token.includes(":") ? token.slice(token.lastIndexOf(":") + 1) : token;
-      if (afterColon.startsWith("-")) continue;
+      if (token.startsWith("-")) continue;
+      if (!token.includes(":")) {
+        // The first bare token is the remote name, not a destination. Counting it as one made
+        // `git push origin` look like a push with a destination and slip past the no-refspec check.
+        if (!remoteSeen) { remoteSeen = true; continue; }
+        // A bare destination, or HEAD, is whatever this checkout is on. From a trunk checkout that
+        // is trunk, and there is nothing in the command to tell, so it is treated as trunk-risky
+        // rather than allowed. `git push origin HEAD` is the idiom an agent actually writes.
+        sawRefspec = true;
+        // A leading `+` is git's own force spelling, and the destination can still be trunk.
+        const bareDest = token.replace(/^\+/, "").replace(/^refs\/heads\//, "");
+        if (bareDest === "HEAD") return "pushing the current branch, which may be trunk";
+        if (TRUNK.has(bareDest)) return "rewriting history on a trunk branch";
+        continue;
+      }
+      sawRefspec = true;
+      const afterColon = token.slice(token.lastIndexOf(":") + 1);
       const clean = afterColon.replace(/^\+/, "").replace(/^refs\/heads\//, "");
       if (TRUNK.has(clean)) {
         return rest.some((t) => /^--force/.test(t) || t === "-f")
@@ -107,6 +135,8 @@ function pushOffence(command) {
           : "pushing to trunk";
       }
     }
+    // No refspec at all: `git push` with only flags, or `git push origin`. Same reasoning.
+    if (!sawRefspec) return "pushing without an explicit refspec, which may be trunk";
   }
   return null;
 }
