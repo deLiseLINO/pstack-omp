@@ -46,7 +46,7 @@ CONTEXT      pointers to files and PRs; upstream reports pasted in full when thi
 ACCEPTANCE   checkable criteria, one per line
 VERIFY       exact commands or the control-skill path, plus known gotchas
 TIMEBOX      rough cap on runtime; on expiry, return partial findings and stop rather than run on
-FORBIDDEN    no gt unless ROLE is the designated stacker; no rebase or force-push unless the
+FORBIDDEN    no topology surgery unless ROLE is the designated stacker; no rebase or force-push unless the
              stacker brief grants the exact operation; no fixes outside scope; unit-specific bans
 REPORT       status, branch, head SHA, PRs, verdict, what you actually ran, deviations,
              suggested follow-ups
@@ -82,9 +82,9 @@ A dependency is a context relay, not just ordering: undeclared upstream context 
 
 #### Stack safety
 
-- The frontier is a computed object, never narrative. Recompute `frontier.json` from `gt` after every merge and stack mutation because GitHub base refs drift mid-restack while gt tracking is authoritative: ordered PR list, branch names, head SHAs, a generation number, the lowest unmerged PR. Resolve it where gt knows the stack, normally the stacker's clone; a checkout whose gt metadata never saw the submits reports no PRs and the command errors rather than guessing.
-- Exactly one stacker per stack may run `gt`, serialized within its stack; record the holder in the standing orders. Restacks run in an isolated owner workspace; avoid running a large restack on an interactive workstation.
-- Workers never rebase and never run `gt`. Babysitters follow `skill://poteto-mode/playbooks/babysit.md`, one per stack, scoped to one immutable frontier generation; they report conflicts to the stacker rather than restacking.
+- The frontier is a computed object, never narrative. Recompute `frontier.json` after every merge and stack mutation, because base refs drift mid-restack. `orch frontier` resolves the order from the forge's own PR base refs when it can, and refuses to guess rather than inventing an order when it cannot; record what it could not resolve instead. A pull request that is not reachable from trunk is reported as unattached rather than assumed to be in the stack. Resolve it where gt knows the stack, normally the stacker's clone; a checkout whose gt metadata never saw the submits reports no PRs and the command errors rather than guessing.
+- Exactly one stacker per stack rewrites topology, serialized within its stack; record the holder in the standing orders. Restacks run in an isolated owner workspace; avoid running a large restack on an interactive workstation.
+- Workers never rebase and never touch stack topology. Babysitters follow `skill://poteto-mode/playbooks/babysit.md`, one per stack, scoped to one immutable frontier generation; they report conflicts to the stacker rather than restacking.
 - PR closes and retargets go through the stacker only, and only once the operator has approved that specific change; one writer is not consent. Closing a base PR orphans every chain above it. Merges and stack surgery are units with briefs like any other.
 - One retro watcher follows merged PRs for reverts, post-merge CI breaks, and orphaned follow-ups.
 
