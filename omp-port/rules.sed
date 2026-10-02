@@ -394,3 +394,50 @@ s#Recompute `frontier.json` from `gt` after every merge and stack mutation becau
 
 s#- Workers never rebase and never run `gt`\.#- Workers never rebase and never touch stack topology.#
 
+
+## 12. Findings from a 71-agent per-file audit. Each rule here is a sentence that survived the
+## rewrite and is wrong on omp. They cluster into two classes worth remembering: a document
+## rewritten on one side of a page and not the other, and a paraphrase of a harness rule that
+## dropped half of it. Both are invisible to a diff that only looks for Cursor vocabulary.
+
+# Bare `/<name>` is not an omp command. Skills register as `/skill:<name>`; unhandled slash input
+# falls through as literal prompt text, and with `disable-model-invocation: true` the skill is
+# hidden from the index, so the model cannot recover it either. Two skills in this port already
+# use the right form and the gate only greps the backticked one, which is why these survived.
+s#Use for /arena,#Use for /skill:arena,#
+s#Use for /swarm,#Use for /skill:swarm,#
+s#Use for /architect,#Use for /skill:architect,#
+s#Use for /figure-it-out,#Use for /skill:figure-it-out,#
+s#Use for /show-me-your-work,#Use for /skill:show-me-your-work,#
+s#"/architect with checkpoint,"#"/skill:architect with checkpoint,"#
+
+# `cursor location` is a Cursor composer affordance: the editor injects the caret position. omp is
+# a terminal harness with no editor-state primitive, so an agent following the hint looks for a
+# signal that does not exist.
+s#(open files, recent edits, cursor location, what was just discussed)#(open files, recent edits, what was just discussed)#
+
+# False: a subagent's `tools:` list does not remove MCP tools or server instructions
+# (omp://system-prompt-customization.md). The real restriction on `scout` is the tool set, not MCP.
+s#The strict `scout` definition has no MCP grant, so never assign MCP work to it\.#The strict `scout` definition has no write tools, so keep it off any lane that must edit. Its MCP tools are inherited: a task agent's `tools:` list does not remove them.#
+s#an exact discovered full-access worker for citation spot-checks that call MCP\. The strict `scout` definition cannot serve that lane\.#an exact discovered full-access worker for citation spot-checks that call MCP. `scout` inherits MCP tools and can serve that lane, but it cannot write.#
+
+# `spawn on a fast, cheap model` asks for a per-spawn knob the task tool does not have. Every
+# sibling fan-out skill states the real mechanism; this one kept the Cursor-era phrasing.
+
+# `subagents/` is a Cursor transcript layout level. On omp the third level is
+# `<session-stem>/<AgentId>/<AgentId>.<Step>.jsonl`, and the prescribed glob matched 0 files against
+# 181 that exist. The prose one line below was corrected; the command was not.
+s#/\*/subagents/\*\.jsonl#/*/*/*.jsonl#
+
+# No omp system prompt names the session transcript tree; `history://<id>` is the documented
+# surface. The path is correct, the justification for trusting it was not.
+s#(the system prompt names the path)#(`history://<id>` is the documented surface)#
+
+# omp discovers skills one level under the root; the nested shape this prescribes is explicitly
+# not discovered, so the skill it produces silently never registers.
+
+# The `how` skill has no modes. It branches on Step 2a Explore / Step 2b Direct Explain.
+
+# Unqualified force-push blocks the port's own rebase flow, which `pstackpolicy` explicitly permits
+# and `autopilot-stack` prescribes. Scope the pause the way the rest of the port scopes it.
+s#(force-push, delete production data, send external messages)#(force-push to a shared or trunk branch, delete production data, send external messages)#
