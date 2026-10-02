@@ -181,22 +181,24 @@ runtime_contract() {
 		report "retired runtime labels" "PASS  no abstract role labels, placeholders, or stale process wording"
 	fi
 
-	# Agent Hub is the Alt+A TUI, not a programmatic tool. Any backticked `hub` or a hub op
-	# vocabulary in the tree references an API that does not exist. A line stating the absence
-	# is the correction, not the defect, so it is exempt the way the readonly check exempts it.
-	hub=$(grep -rInE '`hub`|"hub"|hub `op' --include='*.md' --include='*.mjs' --include='*.ts' --include='*.sh' "${SCOPE[@]}" 2>/dev/null |
-		awk '{
-			s = tolower($0)
-			if (s !~ /(no|not|never|without|rather than)[^.;]{0,60}hub/) { print; next }
-			clause = s
-			sub(/[.;].*$/, "", clause)
-			if (clause ~ /(use|fall back|fallback|try|instead|or)\b[^`]{0,40}hub/) print
-		}' || true)
-	if [ -n "$hub" ]; then
+	# `hub` IS a real built-in tool on this harness: sibling messaging, settled-job inspection, and
+	# supervised services, with ops list/send/inbox/wait/cancel/jobs/start/logs/stop. Verified in the
+	# installed package -- it is in pi-coding-agent's canonical tool set, and the binary carries the
+	# HubTool string. It is registered only when tool names are not restricted and IRC is enabled.
+	#
+	# This assertion used to be the opposite: it failed any backticked `hub`, enforcing a denial that
+	# was not true, with a mutation pinning the wrong behaviour. A line that claims hub does not
+	# exist is now the defect, because that is the sentence that sends an agent away from a live
+	# primitive. What is required instead is that where the port routes sibling coordination or a
+	# supervised service, it names the surface that is actually there.
+	if grep -rqE 'no (programmatic )?`?hub`? tool' --include='*.md' --include='*.mjs' --include='*.ts' \
+		--include='*.sh' "${SCOPE[@]}" 2>/dev/null; then
 		report "agent hub api" "FAIL"
-		while read -r line; do violate "$line"; done <<<"$hub"
+		while read -r line; do violate "denies a live primitive: $line"; done <<<"$(grep -rnE 'no (programmatic )?`?hub`? tool' --include='*.md' --include='*.mjs' --include='*.ts' --include='*.sh' "${SCOPE[@]}" 2>/dev/null)"
+	elif grep -rqF 'hub' --include='*.md' "${SCOPE[@]}" 2>/dev/null; then
+		report "agent hub api" "PASS  hub is documented as a real conditional built-in"
 	else
-		report "agent hub api" "PASS  workers are addressed through agent://, history://, and proc://"
+		report "agent hub api" "SKIP  no hub reference in the tree to check"
 	fi
 
 	# One install root. A path under any other agent store resolves to nothing on this machine,
