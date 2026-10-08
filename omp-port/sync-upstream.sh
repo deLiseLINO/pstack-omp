@@ -24,6 +24,7 @@
 # Exit 0 clean, 1 failure, including a patch that no longer applies.
 # Override the canonical checkout location with CANON=/path.
 set -euo pipefail
+# shellcheck source=omp-port/lib.sh
 . "$(dirname "$0")/lib.sh"
 cd "$(dirname "$0")/.."
 
@@ -64,8 +65,8 @@ write_json() {
 	shift
 	local tmp
 	tmp=$(mktemp "$path.XXXXXX")
+	cp -p "$path" "$tmp"
 	jq --indent 2 "$@" "$path" >"$tmp"
-	chmod --reference="$path" "$tmp"
 	mv "$tmp" "$path"
 }
 
@@ -86,11 +87,11 @@ do_build() {
 	rm -rf "$work"
 
 	read -r n p k < <(port_counts plugins/pstack)
-	write_json plugins/pstack/package.json --arg v "$version" '.version = $v'
+	write_json plugins/pstack/package.json --arg v "$version" ".version = \$v"
 	write_json .omp-plugin/marketplace.json --arg v "$version" \
 		--arg d "$n skills, $p playbooks, $k principles, the poteto-mode pin, and two agents. Upstream cursor/plugins pstack at ${sha:0:7}." \
-		'.metadata.version = $v
-		 | (.plugins[] | select(.name == "pstack")) |= (.version = $v | .description = $d)'
+		".metadata.version = \$v
+		 | (.plugins[] | select(.name == \"pstack\")) |= (.version = \$v | .description = \$d)"
 	[ "$move" != yes ] || printf '%s\n' "$sha" >"$PIN_FILE"
 	git add -A plugins/pstack "$PIN_FILE" plugins/pstack/package.json .omp-plugin/marketplace.json
 

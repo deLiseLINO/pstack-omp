@@ -3,12 +3,12 @@
 An omp marketplace carrying two plugins.
 
 `pstack` is Lauren Tan's engineering methodology for Cursor, ported to oh-my-pi and made
-model and provider agnostic, 49 skills with 23 playbooks and 23 principle leaves.
+model and provider agnostic, 53 skills with 23 playbooks and 24 principle leaves.
 `fan-out` is a small omp-native skill for wide parallel runs, written from measurement
 rather than doctrine.
 
 ```
-/marketplace add negoro26/pstack-omp
+/marketplace add deLiseLINO/pstack-omp
 /marketplace install pstack@pstack-omp
 /marketplace install fan-out@pstack-omp
 ```
@@ -24,3 +24,7 @@ The `pstack-omp` runtime adapter incorporates Daniel Sebban's OMP routing work f
 [dsebban/skills](https://github.com/dsebban/skills). It resolves the live task or vibe
 surface without requiring a fixed agent roster. The original scripts remain in place.
 The pin respects saved on/off state before the `--poteto` default on session resume.
+
+This fork tracks official pstack 0.15.15. It adds `/correct`, `/benchmark-checklist`,
+`/poteto-help`, and `principle-explain-the-number` while retaining the OMP runtime adapter.
+Upstream development of the original port is at [negoro26/pstack-omp](https://github.com/negoro26/pstack-omp).

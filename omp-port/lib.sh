@@ -9,12 +9,12 @@ CANON="${CANON:-/tmp/cursor-plugins}"
 RULES="${RULES:-$PORT_DIR/rules.sed}"
 UPSTREAM_URL=https://github.com/cursor/plugins
 
-PAT_SLUG='\b(claude-[a-z0-9.-]+|gpt-[0-9][a-z0-9.-]*|grok-[a-z0-9.-]+|gemini-[a-z0-9.-]+|opus-[a-z0-9.-]+)\b'
-PAT_CAPS='omp (has no|does not support|cannot|lacks) [A-Za-z`_.:-]+'
-PAT_RESIDUE='cursor-team-kit|/deslop|run_in_background|<agent-transcripts>|~/\.cursor/|AskQuestion|cloud_base_branch|~/\.omp/skills/|~/\.omp/pstack/|environment: "cloud"'
+export PAT_SLUG='\b(claude-[a-z0-9.-]+|gpt-[0-9][a-z0-9.-]*|grok-[a-z0-9.-]+|gemini-[a-z0-9.-]+|opus-[a-z0-9.-]+)\b'
+export PAT_CAPS='omp (has no|does not support|cannot|lacks) [A-Za-z`_.:-]+'
+export PAT_RESIDUE='cursor-team-kit|/deslop|run_in_background|<agent-transcripts>|~/\.cursor/|AskQuestion|cloud_base_branch|~/\.omp/skills/|~/\.omp/pstack/|environment: "cloud"'
 # Every conflict git writes is bracketed by <<<<<<< and >>>>>>>, so a bare ======= needs no
 # branch of its own and a seven-character setext underline stops being a false positive.
-PAT_MARKER='^(<{7} |\|{7}( |$)|>{7} )'
+export PAT_MARKER='^(<{7} |\|{7}( |$)|>{7} )'
 # The last model-slug rule in rules.sed is a catch-all, so an upstream slug nobody wrote a tiered
 # rule for still comes out model-agnostic. What it rewrote is reported, never silently accepted,
 # and it is found by rebuilding without it and grepping for what it would have matched. Its
@@ -63,10 +63,16 @@ extract_upstream() {
 # Step 2, the substitution table. Binary files are skipped rather than corrupted, which is what
 # grep -I reports when the empty pattern does not match.
 apply_rules() {
-	local work="$1" rules="$2" f
+	local work="$1" rules="$2" f tmp
 	while IFS= read -r -d '' f; do
 		if grep -Iq '' "$f"; then
-			sed -E -i -f "$rules" "$f" || return 1
+			tmp=$(mktemp) || return 1
+			if ! sed -E -f "$rules" "$f" >"$tmp"; then
+				rm -f "$tmp"
+				return 1
+			fi
+			cat "$tmp" >"$f" || { rm -f "$tmp"; return 1; }
+			rm -f "$tmp"
 		fi
 	done < <(find "$work" -type f -print0)
 }

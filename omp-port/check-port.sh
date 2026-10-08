@@ -3,8 +3,9 @@
 # Usage: bash omp-port/check-port.sh [canonical-clone]
 # The argument, or CANON, is the cursor/plugins clone the reproducible check builds from.
 set -uo pipefail
+# shellcheck source=omp-port/lib.sh
 . "$(dirname "$0")/lib.sh"
-cd "$(dirname "$0")/../plugins/pstack"
+cd "$(dirname "$0")/../plugins/pstack" || exit 1
 CANON="${1:-$CANON}"
 fail=0
 report() { printf '%-28s %s\n' "$1" "$2"; }
@@ -92,7 +93,7 @@ scan "$PAT_RESIDUE" "cursor residue" residue
 # omp's task wire has no readonly field, so a bare `readonly: true` task parameter
 # is silently ignored. Read-only posture must be a brief-level tool grant plus a
 # write ban, with the skill stating omp cannot enforce it.
-ro=$(grep -rIn -E '`readonly`:\s*`?true`?|readonly:\s*true' --include='*.md' "${SCOPE[@]}" 2>/dev/null)
+ro=$(grep -rIn -E "\`readonly\`:\s*\`?true\`?|readonly:\s*true" --include='*.md' "${SCOPE[@]}" 2>/dev/null)
 if [ -n "$ro" ]; then
 	report "readonly posture" "FAIL"
 	while read -r r; do violate "unenforceable readonly: $r"; done <<<"$ro"
@@ -248,7 +249,7 @@ fi
 # The tree is build output. Rebuilding the pin has to reproduce it byte for byte outside the
 # owned paths, otherwise someone hand-edited a file the next sync will overwrite.
 pin=$(tr -d '[:space:]' <"$PORT_DIR/UPSTREAM")
-scratch=$(mktemp -d)
+scratch=$(mktemp -d) || exit 1
 buildlog=$(mktemp)
 canon_ok=no
 if ! ensure_canon "$pin" >"$buildlog" 2>&1; then
@@ -269,7 +270,7 @@ else
 	# Owned content is the port's, so the build is judged on everything else.
 	while IFS= read -r p; do
 		[ -e "$p" ] || continue
-		rm -rf "$scratch/$p"
+		rm -rf "${scratch:?}/$p"
 		mkdir -p "$(dirname "$scratch/$p")"
 		cp -a "$p" "$scratch/$p"
 	done < <(owned_paths)

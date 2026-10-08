@@ -10,7 +10,7 @@ Investigate the motivation and intent behind code.
 
 Companion to the `how` skill. `how` answers what the code does and how it works. `why` answers what forces led to its shape.
 
-Each spawn below names a role line in the `pstack-models.mdc` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Task tool rejects a slug, use the default and say so. If it rejects the default, use the closest valid slug of the same family from its error message.
+Each participant names a role and default capability. Resolve its saved model choice through `skill://pstack-omp` against the live roster and configuration; never pass a per-call `model` field. Aliases preserve parent-model inheritance on task runtimes. Detect available models before choosing an equivalent fallback of the same family and reasoning tier, report rejected choices and actual resolved models, and keep saved user configuration unchanged during workflow execution.
 
 ## Operating Posture
 
@@ -81,7 +81,7 @@ Launch all matching investigators in a single message so they run concurrently. 
 
 Subagent config (each):
 - `agent`: `task` (omp's general-purpose bundled agent)
-- `model`: the `why investigators` line, default your fast code model
+- Model role: `why investigators`, resolved through `skill://pstack-omp` and saved runtime configuration, not a task payload field.
 - Full tools per spawn. There is no `readonly` field and no Ask mode on omp's task wire, so nothing strips MCP access, which would otherwise disable MCP-backed investigators entirely. Investigators still shouldn't write anything.
 
 Each investigator gets:
@@ -125,7 +125,7 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 Spawn one synthesizer subagent:
 
 - `agent`: `task` (omp's general-purpose bundled agent)
-- `model`: the `why synthesizer` line, default your strongest judgment model
+- Model role: `why synthesizer`, resolved through `skill://pstack-omp` and saved runtime configuration, not a task payload field.
 - Full tools per spawn. The synthesizer's quality check spot-verifies citations, which can require MCP access. There is no such mode on omp's task wire, so nothing strips MCPs.
 
 The synthesizer gets:

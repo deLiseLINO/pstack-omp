@@ -28,7 +28,7 @@ Inspect the tools and schemas exposed in this session, not a version number or a
 | researcher | librarian | fast | Source-verified external research. |
 | synthesizer | reviewer | good | Adjudicate frozen evidence, not new implementation. |
 | implementer | default worker | good | Bounded implementation with explicit write ownership. |
-| owner | default worker | good | Retain context for one coupled workstream. |
+| owner | default worker | good | Own one unit; retain a session only for costly local state. |
 | mechanical | sonic | fast | Fully specified low-judgment edits. |
 
 The live roster is authoritative. Never invent missing specialists. When a preferred specialist is absent, use an available worker with the role explicitly in its brief; omit `agent` for the default worker. `poteto-agent` and `comment-sicko` are optional bundled custom agents. Use their exact names only when discovered. Otherwise include their skill/agent instructions as file pointers in an available worker's brief.
@@ -43,7 +43,7 @@ Children start blank and do not inherit the parent conversation. Every brief mus
 - **Change:** relevant source pointers, settled contract, constraints, dependencies, base SHA or generation, and decisions already made.
 - **Acceptance:** observable done predicates, required evidence, allowed verification commands or an explicit root-only validation rule, report format, and stop conditions.
 
-Common immutable material belongs in batch context or an accessible artifact. Never substitute a file pointer for the brief's goal or ownership. Tell ordinary children not to start subagents or ask the user directly. A role change requires a fresh context. A coupled correction may reuse the owner. Children report only checks actually executed; the root independently accepts or rejects the result.
+Common immutable material belongs in batch context or an accessible artifact. Never substitute a file pointer for the brief's goal or ownership. Tell ordinary children not to start subagents or ask the user directly. Start fresh for every follow-up, fix, retry, and queue round. Reuse only when a worker holds a checkout, uncommitted changes, or a live process that is costly to recreate, and name that state in the brief. A role change always requires a fresh context. Children report only checks actually executed; the root independently accepts or rejects the result.
 
 ## Task contract
 
@@ -60,12 +60,12 @@ Record returned agent and job identifiers. Results auto-deliver. Read complete o
 These are documented OMP wire shapes; confirm the live schema before calling them:
 
 - `vibe_spawn({ cli: "fast" | "good", prompt, name? })` starts a blank persistent worker. Put the canonical role and exact workspace in `prompt`; there is no task-style `agent`, `tasks[]`, `context`, or `isolated` field.
-- `vibe_send({ session, message })` steers or resumes the recorded worker for a coupled phase or bounded correction.
+- `vibe_send({ session, message })` steers active work. Resume completed work only for the costly-local-state exception below; otherwise use `vibe_spawn` with a fresh brief.
 - `vibe_wait({ sessions?, timeout? })` waits for a watched turn to settle. It is not an all-workers barrier. Account for every required participant before advancing.
 - `vibe_list({})` gives current workers and resolved metadata.
 - `vibe_kill({ session })` ends a superseded worker after required artifacts are durable.
 
-Spawn independent workstreams before waiting. Use one persistent worker per coupled workstream. Workers share the configured workspace unless an explicit worktree is arranged in their briefs; do not assume isolation. Start independent verification in a separate worker after implementation artifacts freeze. A director without execution tools sends exact verification commands to that verifier, reads its evidence and touched files, and owns acceptance. It must not bypass its restricted tools to run commands itself.
+Spawn independent workstreams before waiting. Start fresh workers for new phases and follow-ups unless costly local state requires retaining the owner. Workers share the configured workspace unless an explicit worktree is arranged in their briefs; do not assume isolation. Start independent verification in a separate worker after implementation artifacts freeze. A director without execution tools sends exact verification commands to that verifier, reads its evidence and touched files, and owns acceptance. It must not bypass its restricted tools to run commands itself.
 
 Results self-deliver into the director conversation; the vibe tool schema does not guarantee an `agent://<id>` resource, so use one when the runtime returns it and otherwise read the delivered report. Transcripts, when the runtime reports them, live at `history://<id>`. Preserve the actual returned identifiers instead of constructing them from display names. Vibe sessions belong to the current owner/scope; never control another scope's worker. Restarted workers require live-state reconciliation before sending new work.
 
@@ -73,7 +73,7 @@ Results self-deliver into the director conversation; the vibe tool schema does n
 
 ### Bounded session
 
-Start one standalone assignment, collect its complete report and artifacts, then independently verify acceptance. An in-scope correction can go to the same resumable worker. A different role or unit gets a fresh worker.
+Start one standalone assignment, collect its complete report and artifacts, then independently verify acceptance. Start a fresh worker for a correction, retry, or follow-up. Reuse a resumable worker only when its checkout, uncommitted changes, or live process is costly to recreate; carry the named state and its generation in the next brief. A different role or unit always gets a fresh worker.
 
 ### Panel
 
@@ -81,7 +81,7 @@ Partition slices or candidates with distinct ownership. Start all participants b
 
 ### Long-lived owner
 
-Keep one worker on one coupled unit. Record its workspace and identity. Send only coupled next phases, evidence-based answers, or bounded corrections. Require a report at each acceptance boundary; independently verify before authorizing the next phase. Do not give the same branch to a sibling owner.
+Retain one worker only while its checkout, uncommitted changes, or live process is costly to recreate. Record that state, its workspace, and the worker's identity. Send only coupled next phases, evidence-based answers, or bounded corrections while the exception applies. Require a report at each acceptance boundary; independently verify before authorizing the next phase. Otherwise hand the report and artifacts to a fresh worker. Do not give the same branch to a sibling owner.
 
 ### One-shot watcher
 

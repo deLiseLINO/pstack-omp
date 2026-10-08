@@ -1,6 +1,6 @@
 ---
 name: poteto-agent
-description: "Compatibility target for imported poteto-mode delegation. Runs one bounded implementation brief with the active playbook and no child delegation."
+description: "Compatibility target for imported poteto-mode delegation. Starts fresh for each new task, with reuse only under poteto-mode's strict stateful exceptions. Runs one bounded implementation brief with the active playbook and no child delegation."
 tools:
   - read
   - grep

@@ -52,6 +52,30 @@ current pin after editing `rules.sed`, `patches/`, or `owned.txt`. A target that
 `pstack/` is refused, because the next run has to find that sha again in the path-filtered history.
 Then run `bash omp-port/check-port.sh` and commit.
 
+On macOS, install the GNU tools used by the rewrite table and gate:
+
+```bash
+brew install gnu-sed gpatch grep
+export PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$(brew --prefix gpatch)/libexec/gnubin:$(brew --prefix grep)/libexec/gnubin:$PATH"
+```
+
+The fork targets pstack 0.15.15 at `df58112`. Its runtime patch is rebased on that
+source, including fresh-worker defaults, benchmark checks, and PR tracking rules.
+`poteto-help` uses the fork's installation instructions and public upstream guide links;
+the loaded OMP runtime adapter takes precedence over Cursor-specific guide behavior.
+The adapter retains an owner only for costly checkout, uncommitted changes, or live process state.
+
+After rebuilding, install the script dependencies and run their declared checks:
+
+```bash
+bun install --cwd plugins/pstack/skills/poteto-mode/scripts --frozen-lockfile
+bun run --cwd plugins/pstack/skills/poteto-mode/scripts test
+bun run --cwd plugins/pstack/skills/poteto-mode/scripts typecheck
+bun test plugins/pstack/extensions/potetomode/index.test.js
+```
+
+
+
 There is nothing to resolve. The build never edits an upstream file in place, so upstream text and
 port text cannot collide. A patch that no longer applies exits 1, and that or a gate FAIL leaves the
 PR open for a human with both outputs in the body and the reason printed in the job log.
