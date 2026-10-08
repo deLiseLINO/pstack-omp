@@ -35,14 +35,14 @@ Each reviewer and the synthesizer name a role line in the `pstack-models.mdc` ru
 | Lens | Role line | Default `model` | Prompt template |
 |---|---|---|---|
 | Judgment | `reflect judgment, divergent, synthesizer` | your strongest judgment model | `references/judgment-reviewer.md` |
-| Tooling | `reflect tooling` | your strongest instruction-following model | `references/tooling-reviewer.md` |
+| Tooling | `reflect tooling` | your fast code model | `references/tooling-reviewer.md` |
 | Divergent | `reflect judgment, divergent, synthesizer` | your strongest judgment model | `references/divergent-reviewer.md` |
 
 Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `Task` response body.
 
 ### 3. Synthesize
 
-One `Task` call, `agent`: `task` (omp's general-purpose bundled agent), with `model` from the `reflect judgment, divergent, synthesizer` line (default your strongest judgment model), full tools per spawn. The synthesizer's quality check includes spot-verifying citations, which can require MCP access. There is no such field on omp's task wire, so nothing strips MCPs. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
+One `Task` call, `agent`: `task` (omp's general-purpose bundled agent), with its synthesizer role resolved through `skill://pstack-omp` and saved runtime configuration, never a per-call model field, full tools per spawn. The synthesizer's quality check includes spot-verifying citations, which can require MCP access. There is no such field on omp's task wire, so nothing strips MCPs. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
 ### 4. Structural enforcement check
 

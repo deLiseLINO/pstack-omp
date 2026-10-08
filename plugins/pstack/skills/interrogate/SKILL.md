@@ -38,15 +38,14 @@ Launch all reviewers in a single message using the Task tool. Use the `interroga
 | Subagent | Default model |
 |----------|---------------|
 | Reviewer A | your strongest judgment model |
-| Reviewer B | your strongest instruction-following model |
-| Reviewer C | your fast code model |
+| Reviewer B | your fast code model |
 
 For each reviewer:
 - `agent`: `task` (omp's general-purpose bundled agent)
-- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line. For an `auto` or `inherit-parent` entry, omit `model` so that reviewer runs on the parent model.
+- Model role: each saved `interrogate reviewers` entry, preserving panel size and aliases through `skill://pstack-omp`. Never pass a per-call model field.
 - read-only posture. The brief grants only Glob, Grep, and Read, and forbids writes
 
-If the Task tool rejects a configured entry, run that reviewer on the table default of its family and say so. Families go by prefix: `claude-*`, `gpt-*`, and `grok-*`. With no family match, use Reviewer A's default. If it rejects a table default, check the valid slugs in the Task tool's error message, pick the closest equivalent (prefer the highest-reasoning tier of the same family), spawn with it, and open a separate PR to update the default table. Do not block the review on the slug issue. Never treat an alias entry as a rejected slug or apply either fallback to it.
+If the runtime cannot resolve a configured reviewer model, detect available equivalents and prefer the same family and reasoning tier. Report the fallback and actual resolved model, preserving the independent reviewer count. Do not block solely on an unavailable default when a detected equivalent exists. Never treat `auto` or `inherit-parent` as rejected model slugs. Do not rewrite saved operator configuration during the review; report any default-table correction separately.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent

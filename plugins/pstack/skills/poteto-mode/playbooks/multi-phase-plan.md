@@ -34,7 +34,6 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 ### Arm the program
 
 - [ ] State the protocol and this plan to the operator, then stop. Start execution only on the operator's explicit go.
-- [ ] On the operator's go, arm a `/goal` with this exact text. Use `/goal` only if exposed and enabled; otherwise retain the same predicate in the root’s durable plan. Do not change global configuration to enable it. "<The plan path, the PR ids in order, the verification rule, who merges, and the done condition.>"
 - [ ] Read these at program start and re-read them at every tick. The install on disk is authoritative, not a remote ref.
   - [ ] `~/.omp/plugins/node_modules/pstack/skills/poteto-mode/playbooks/<execution playbook>.md`
   - [ ] `~/.omp/plugins/node_modules/pstack/skills/swarm/SKILL.md`
@@ -42,8 +41,8 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
   - [ ] `~/.omp/plugins/node_modules/pstack/skills/poteto-mode/playbooks/opening-a-pr.md`
   - [ ] `~/.omp/plugins/node_modules/pstack/skills/<each other leaf skill the program uses>`
   - [ ] `git show origin/main:<each skill or doc the product repo vendors itself>`
-- [ ] Arm the 30-minute audit tick. In session, omp's `/loop`. For a wake that must land out of session, a `hub` supervised watcher or a systemd user timer. Never leave the cadence to memory.
-- [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from its install path and the armed /goal. Audit the operation against both and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
+- [ ] On the operator's go, arm an hourly root-controlled timer with the tick prompt below. The upstream `/loop 1h` means an hourly cadence, not OMP's total run duration; detect an available scheduler or supervised process through the live runtime and report a missing wake capability. Never leave the cadence to memory.
+- [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from its loaded skill location. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
 - [ ] On the operator's hold or stand-down, send every owner a zero-writes order at once.
 
 ### Spawn owners
@@ -58,7 +57,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 ### PR mechanics, for every PR
 
 - [ ] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
-- [ ] Open the PR ready, never draft, with `origin pr create --status open --base <base-branch>` or `gh pr create --base <base-branch>` according to the resolved forge. A stack child targets its parent branch.
+- [ ] Open the PR ready, never draft, per **Opening a PR**. Use the run's built-in PR tool when it has one, else `origin pr create --status open --base <base-branch>` or `gh pr create --base <base-branch>` according to the resolved forge. A stack child targets its parent branch.
 - [ ] Run the repo's lint and typecheck once before the PR-facing push. Push with hooks on.
 - [ ] Run the `unslop` skill (`skill://unslop`) plus `omp cleanse --all` before each commit and `/no-comments` before review.
 - [ ] Triage every Bugbot and security-reviewer comment per `skill://poteto-mode/references/bugbot-triage.md`.
