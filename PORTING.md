@@ -207,8 +207,8 @@ application while `rules.sed` stayed clean.
 The split is by kind, not by size.
 
 - A token or a field name goes in `rules.sed`. `subagent_type`, `run_in_background`, `readonly`,
-  and `~/.cursor/rules/` are matched as tokens rather than as sentences, so an upstream reword
-  cannot break them. This is what makes the layer durable: a rule that stops matching costs one
+  and Cursor's per-project rule-file path are matched as tokens rather than as sentences, so an
+  upstream reword cannot break them. This is what makes the layer durable: a rule that stops matching costs one
   line, a patch that stops matching costs a merge.
 - Port prose goes in the owned skills, which `install_tree` restores from `HEAD` and which
   therefore cannot conflict with upstream at all.
@@ -218,8 +218,7 @@ The split is by kind, not by size.
 
 Author a patch against **post-rules** text. `rules.sed` runs first, so a hunk quoting the raw
 upstream line fails whenever an earlier rule rewrote it. `worktree-audit-omp.patch` deletes a
-comment line that the `~/.cursor/` rule has already rewritten, and its hunk quotes the rewritten
-form.
+comment line that the path rule has already rewritten, and its hunk quotes the rewritten form.
 
 Two failure modes this caught, both silent until a sync ran. An owned path missing from
 `owned.txt` is not owned: `install_tree` rebuilds `plugins/pstack/skills` from upstream and
