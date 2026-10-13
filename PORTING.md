@@ -196,6 +196,44 @@ unified diffs applied after the rules, which is where a change no substitution c
 and runtime contract. `omp-mechanics` keeps only pstack-specific OMP deltas, and `setup-pstack`
 owns model selection and config writes. Upstream syncs preserve these paths without rewriting them.
 
+### A patch rewrites code, never prose
+
+A unified diff matches on context lines, so a patch against upstream markdown is a bet that
+upstream will not retype the paragraph around the change. Upstream reworks its skill prose
+constantly: one commit inside a single sync window distilled 36 files. The patch this replaced was
+98% prose by byte count, across 25 markdown files, which is why every daily sync failed on patch
+application while `rules.sed` stayed clean.
+
+The split is by kind, not by size.
+
+- A token or a field name goes in `rules.sed`. `subagent_type`, `run_in_background`, `readonly`,
+  and `~/.cursor/rules/` are matched as tokens rather than as sentences, so an upstream reword
+  cannot break them. This is what makes the layer durable: a rule that stops matching costs one
+  line, a patch that stops matching costs a merge.
+- Port prose goes in the owned skills, which `install_tree` restores from `HEAD` and which
+  therefore cannot conflict with upstream at all.
+- A patch is for code: control flow, a data shape, a file upstream does not have. Both remaining
+  patches touch a script, and one of them replaced two interlocking patches that had to be read
+  together to apply, because one wrote a transcript lookup the other deleted.
+
+Author a patch against **post-rules** text. `rules.sed` runs first, so a hunk quoting the raw
+upstream line fails whenever an earlier rule rewrote it. `worktree-audit-omp.patch` deletes a
+comment line that the `~/.cursor/` rule has already rewritten, and its hunk quotes the rewritten
+form.
+
+Two failure modes this caught, both silent until a sync ran. An owned path missing from
+`owned.txt` is not owned: `install_tree` rebuilds `plugins/pstack/skills` from upstream and
+restores only the listed paths, so dropping `skills/setup-pstack` shipped upstream's hardcoded
+model slugs. And a gate check that greps for a literal goes stale when upstream changes shape:
+upstream dropped the per-entry slug from its router index and documented the title-to-kebab rule in
+the index preamble instead, so both parity checks read every entry as unnamed and failed against a
+correct tree. They now derive the name the way the preamble tells the agent to.
+
+The gate used to assert that port-authored prose sat *inside* upstream's playbooks, which is the
+opposite of mirroring upstream and made every one of those assertions a rule that went stale. Those
+checks are gone. What remains is residue detection: Cursor wire fields, model slugs, retired role
+keys, install paths, and build integrity.
+
 `skills/setup-pstack` is port-owned, so the build restores it from `HEAD` and never rebuilds it from
 upstream. Upstream's version writes a Cursor rules file with no omp meaning, so the fork is
 deliberate, but the drift list alone does not mark it: an upstream edit to that skill shows up as an
