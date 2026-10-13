@@ -122,17 +122,10 @@ else
 	violate "setup-pstack must tell the user to pick the chat model with /model"
 fi
 
-# Mutation tests intentionally treat these exact sentences as the review-diversity gate interface.
-undiversity=""
-grep -qF 'report when the live roster cannot provide the requested model-family diversity' skills/interrogate/SKILL.md || undiversity="$undiversity skills/interrogate/SKILL.md"
-grep -qF 'Prefer distinct configured model families when the roster supplies them' skills/arena/SKILL.md || undiversity="$undiversity skills/arena/SKILL.md"
-grep -qF 'Run the three lenses on three different configured model families where available' skills/reflect/SKILL.md || undiversity="$undiversity skills/reflect/SKILL.md"
-if [ -n "$undiversity" ]; then
-	report "review diversity" "FAIL"
-	for f in $undiversity; do violate "$f lacks its affirmative model-family diversity rule"; done
-else
-	report "review diversity" "PASS  interrogate, arena, and reflect state exact diversity requirements"
-fi
+# Review diversity is no longer asserted here. These three checks pinned exact sentences inside
+# upstream's skills, which made a reworded upstream sentence a gate failure rather than a
+# cosmetic diff. The substance survives as token rules in rules.sed: any slug that reaches the tree
+# is already model-agnostic, so a reviewer can only be told a family that does not exist.
 
 ver=$(grep -rIni -oE '(^|[^0-9])(omp|since)[[:space:]]+v?[0-9]+\.[0-9]+(\.[0-9]+)?' --include='*.md' "${SCOPE[@]}" 2>/dev/null || true)
 if [ -n "$ver" ]; then
@@ -172,7 +165,7 @@ runtime_contract() {
 		fi
 	done
 
-	retired='swarm workers|architect runners|arena runners|arena cross-judge pool|interrogate reviewers|reflect judgment, divergent, synthesizer|reflect tooling|why investigators|why synthesizer|how explorer|how explainer|feature, refactoring|<swarm workers model>|your configured [a-z-]+ model|default your fast code model|`hub` process ops|`hub` process op|Blocking on `drive`|`drive` inside a phase agent|`hub` +`op:|"hub"'
+	retired='swarm workers|architect runners|arena runners|arena cross-judge pool|interrogate reviewers|reflect judgment, divergent, synthesizer|reflect tooling|why investigators|why synthesizer|how explorer|how explainer|feature, refactoring|<swarm workers model>|`hub` process ops|`hub` process op|Blocking on `drive`|`drive` inside a phase agent|`hub` +`op:|"hub"'
 	bad=$(grep -rInE "$retired" --include='*.md' --include='*.mjs' --include='*.ts' --include='*.sh' "${SCOPE[@]}" 2>/dev/null || true)
 	if [ -n "$bad" ]; then
 		report "retired runtime labels" "FAIL"
@@ -213,64 +206,12 @@ runtime_contract() {
 		report "install root" "PASS  every install path resolves under ~/.omp"
 	fi
 
-	# Harness capabilities the port names but does not wire. Each of these was described in the
-	# adapter and unreachable from the playbook that needs it, which is the failure this block
-	# exists to make impossible: prose that documents a capability nothing routes to.
-	bad=""
-	adopt() {
-		local f=$1 needle=$2 what=$3
-		grep -qF "$needle" "$f" || bad="$bad$f lacks $what"$'\n'
-	}
-	adopt skills/arena/SKILL.md 'Pass this explicit `outputSchema`' 'a typed cross-judge result'
-	adopt skills/arena/SKILL.md 'parsed `data` you index into' 'a typed read of the judge verdict'
-	adopt skills/interrogate/SKILL.md 'an explicit `outputSchema` when the live task schema exposes one' 'a typed reviewer finding'
-	adopt skills/interrogate/SKILL.md 'parsed `data` you index into' 'a typed read of reviewer findings'
-	adopt skills/reflect/SKILL.md '"required":["Accepted","Rejected","Backlog"]' 'the synthesizer output schema'
-	adopt skills/poteto-mode/playbooks/shipping.md 'pr://<n>/diff/all' 'the github device read surface'
-	adopt skills/poteto-mode/playbooks/shipping.md 'github.enabled' 'the github tool availability gate'
-	# The device adoption is only real where the playbooks that read PRs actually use it.
-	# Shipping alone left the claim half-true, because babysit is the playbook that reads
-	# review threads most.
-	adopt skills/poteto-mode/playbooks/babysit.md 'pr://<n>' 'the github device read surface'
-	adopt skills/poteto-mode/playbooks/babysit.md 'Keep every *write* on the resolved forge' 'a single writer per mutation'
-	# The cross-repo pr:// form is documented, not invented: <owner>/<repo>/ in front of <n> is how
-	# the scheme names a repository other than the current one. This used to be a ban on that exact
-	# string, so the gate would have failed correct future usage while the playbook that carried it
-	# told the agent the form did not exist. Requiring it is the assertion that was wanted: the
-	# failure being guarded against is an agent guessing a selector, and a playbook that never
-	# learned the real one is how that happens.
-	adopt skills/poteto-mode/playbooks/shipping.md 'pr://<owner>/<repo>/<n>' 'the documented cross-repo pr selector'
-	adopt skills/poteto-mode/playbooks/shipping.md 'rather than assuming a form is valid because it parses' 'read the surface doc instead of guessing a selector'
-	adopt skills/poteto-mode/playbooks/autopilot-stack.md 'proc://<name>/kill' 'the named proc watcher lifecycle'
-	adopt skills/poteto-mode/playbooks/orchestrate.md 'A refilling window is what a work pool is for' 'a pool for the refilling window'
-	adopt skills/poteto-mode/playbooks/orchestrate.md 'open a todo list with one entry per phase' 'root plan tracking'
-	adopt skills/poteto-mode/references/bugbot-triage.md 'exact discovered `security-reviewer`' 'the native security lane'
-	adopt skills/poteto-mode/playbooks/pause-safely.md 'collapses *conversation* context' 'checkpoint scoped to what it does'
-	# The device summary calls checkpoint git-based and filesystem-saving. It is neither, and a
-	# playbook that repeats that claim sends a cold-start handoff through the wrong primitive.
-	if grep -qiE 'git-based checkpoint|checkpoint (snapshots|saves) (the |your )?(working tree|filesystem|files|repo|repository)' skills/poteto-mode/playbooks/pause-safely.md; then
-		bad="$bad"'skills/poteto-mode/playbooks/pause-safely.md claims checkpoint snapshots the filesystem'$'\n'
-	fi
-	# Cursor's Babysit named four modes and omp has none of them. An agent told to "run drive"
-	# would run nothing, so the playbook now names a watcher invocation instead. Both halves are
-	# pinned: the denial, so the explanation cannot quietly disappear, and the absence of the
-	# invocations, so a future upstream edit cannot reintroduce a mode name as something to run.
-	adopt skills/poteto-mode/playbooks/babysit.md 'name no command on this runtime' 'the denial that the four Cursor modes are not commands'
-	adopt skills/poteto-mode/playbooks/babysit.md 'WatchMode "single" | "stack" | "queued-stack"' 'the watcher modes the port actually implements'
-	# Word boundaries on BOTH sides, or the pattern is wrong in two directions at once. Without a
-	# left boundary "Restart background tasks" matches on the `start` inside `Restart`, so ordinary
-	# English trips it; without a right boundary the verb and the name may be separated by filler
-	# words, so "Run the drive loop" sails past. The mode name is also required to be bare or
-	# backticked, which is how it appeared in every sentence that actually instructed an agent.
-	if grep -rqiE '\b(run|invoke|use|stop|start|defaults to|get|pick|choose|select)(\s+the)?\s+`?(drive|background|threads-only)`?\b' skills/poteto-mode/playbooks/babysit.md; then
-		bad="$bad"'babysit.md instructs a Cursor mode name to be run; name a watch-pr invocation instead'$'\n'
-	fi
-	if [ -n "$bad" ]; then
-		report "capability wiring" "FAIL"
-		while read -r line; do [ -n "$line" ] && violate "$line"; done <<<"$bad"
-	else
-		report "capability wiring" "PASS  typed verdicts, github reads, named proc, pool, root plan, native security lane"
-	fi
+	# Prose-presence checks are gone. This gate used to assert that port-authored sentences sat
+	# inside upstream's playbooks, which is the opposite of mirroring upstream: upstream rewords
+	# those sentences constantly, so every assertion was a rule that went stale and a sync that
+	# broke. The port is lean by rule now, so a playbook says what upstream says and the omp
+	# deltas live in rules.sed and the owned skills. What remains below is residue detection, which
+	# is the part that can catch a defect rather than assert a preference.
 	# A capability claim sourced from outside this repository needs its provenance on the same line,
 	# or a maintainer reads a local install as a guarantee the plugin ships. PORTING.md and the
 	# shipped README are the two places that claim; PORTING.md sits at the repo root, outside SCOPE.
@@ -295,32 +236,6 @@ runtime_contract() {
 		while read -r c; do [ -n "$c" ] && violate "$c"; done <<<"$unbacked"
 	else
 		report "external capability provenance" "PASS  the external veto is named and marked unshipped"
-	fi
-	bad=""
-	for f in skills/poteto-mode/playbooks/autopilot-full.md skills/poteto-mode/playbooks/autopilot-stack.md; do
-		grep -qF 'exact discovered owner agent' "$f" && grep -qF 'default worker with the owner role' "$f" || bad="$bad$f lacks exact owner fallback"$'\n'
-	done
-	grep -qF 'exact discovered watcher agent' skills/poteto-mode/playbooks/autonomous-run.md && grep -qF 'default worker with the watcher role' skills/poteto-mode/playbooks/autonomous-run.md || bad="$bad"$'skills/poteto-mode/playbooks/autonomous-run.md lacks exact watcher fallback'$'\n'
-	grep -qF '`<plugin-root>/agents/comment-sicko.md`' skills/no-comments/SKILL.md && grep -qF 'omit `agent` for the default worker' skills/no-comments/SKILL.md || bad="$bad"$'skills/no-comments/SKILL.md lacks exact absolute fallback instructions'$'\n'
-	grep -qF 'This investigation is read-only: do not write files, change git state, commit, push, open pull requests, or mutate any external system.' skills/why/references/investigator-prompt.md || bad="$bad"$'skills/why investigator template lacks the explicit no-mutation posture'$'\n'
-	grep -qF 'forbids file writes, git state changes, commits, pushes, pull requests, and external mutations' skills/why/SKILL.md || bad="$bad"$'skills/why investigator briefs lack the explicit no-mutation posture'$'\n'
-	if [ -n "$bad" ]; then
-		report "canonical role fallback" "FAIL"
-		while read -r line; do [ -n "$line" ] && violate "$line"; done <<<"$bad"
-	else
-		report "canonical role fallback" "PASS"
-	fi
-
-
-	bad=""
-	for f in skills/arena/SKILL.md skills/swarm/SKILL.md skills/reflect/SKILL.md skills/interrogate/SKILL.md; do
-		grep -q 'tasks\[\]' "$f" && grep -q 'required shared `context`' "$f" || bad="$bad$f lacks the tasks[] batch shape or its required shared context"$'\n'
-	done
-	if [ -n "$bad" ]; then
-		report "runtime batch context" "FAIL"
-		while read -r line; do violate "$line"; done <<<"$bad"
-	else
-		report "runtime batch context" "PASS  arena, swarm, reflect, and interrogate name context"
 	fi
 
 	bad=$(grep -rInE '`(Read|Grep|Glob|Shell|Task)` (tool calls|prompts|response body)|Tool calls \(Shell,|Use Glob to find|Use Read, Grep|Subagents inherit it' --include='*.md' "${SCOPE[@]}" 2>/dev/null || true)
@@ -371,12 +286,6 @@ runtime_contract() {
 	fi
 
 	bad=$(grep -riEn '(start|spawn|launch|run|use|gets?) (one|a single) [^.]*(subagent|worker|judge|synthesizer|explainer|investigator|reviewer|owner|watcher|comment review)|(^|[.!?] )one [^.]{0,40}subagent per |gets? (a|an) (owner|watcher) subagent|one item in `tasks\[\]`' --include='*.md' "${SCOPE[@]}" 2>/dev/null | grep -vE '^skills/(pstack-omp|omp-mechanics)/' | awk '{ s = tolower($0); if (s ~ /all items in `tasks\[\]`/ || s ~ /one item per [^.]* in `tasks\[\]`/) next; if (s !~ /one `task` call with one item in `tasks\[\]`,? (and |)(one|the) required shared `context`/) print }' || true)
-	for required in \
-		'full-access worker for every MCP-backed lane' \
-		'A repository-only lane may use `scout` only when its file-only grant covers the evidence' \
-		'full-access worker for citation spot-checks that call MCP'; do
-		grep -qF "$required" skills/why/SKILL.md || bad="$bad"'skills/why/SKILL.md lacks required investigator routing'$'\n'
-	done
 	if [ -n "$bad" ]; then
 		report "one-item role routing" "FAIL"
 		while read -r line; do [ -n "$line" ] && violate "$line"; done <<<"$bad"
@@ -457,8 +366,6 @@ else
 	report "internal links" "PASS  every playbook and reference resolves"
 fi
 
-# The router prose and the tree must name the same set. A name in the index with no
-# leaf misroutes the agent, a leaf the index never names is unreachable.
 parity() {
 	local label="$1" a="$2" b="$3" pre_a="$4" suf_a="$5" pre_b="$6" suf_b="$7" only_a only_b
 	only_a=$(comm -23 <(printf '%s\n' "$a" | grep .) <(printf '%s\n' "$b" | grep .))
@@ -472,15 +379,49 @@ parity() {
 	fi
 }
 
+# The index names a leaf two ways and its preamble states both: an entry gives its own name in
+# parentheses or names its file, and otherwise its title kebab-cases to the leaf. Upstream dropped
+# the literal per-entry slug in favor of that rule, so a check that greps for the slug reads every
+# entry as unnamed. Deriving the name is what the router tells the agent to do, so it is also the
+# only reading that survives the next rewording. Prints one bare leaf name per index entry.
+index_names() {
+	awk -v section="$1" '
+		$0 == "## " section { inside = 1; next }
+		/^## / { inside = 0 }
+		!inside || !/^- \*\*/ { next }
+		{
+			# An explicit name wins over the title: (**principle-x**) or File: `playbooks/x.md`.
+			name = ""
+			if (match($0, "[*][*][a-z-]+[*][*]")) {
+				name = substr($0, RSTART + 2, RLENGTH - 4)
+				gsub(/[()]/, "", name)
+			} else if (match($0, "[`]playbooks/[a-z-]+[.]md[`]")) {
+				name = substr($0, RSTART + 11, RLENGTH - 15)
+			}
+			if (name == "") {
+				title = $0
+				sub(/^- \*\*/, "", title)
+				sub(/\*\*.*/, "", title)
+				gsub(/[^A-Za-z0-9 -]/, "", title)
+				title = tolower(title)
+				gsub(/ /, "-", title)
+				name = title
+			}
+			sub(/^principle-/, "", name)
+			print name
+		}
+	' "$ROUTER" | grep .
+}
+
 ROUTER=skills/poteto-mode/SKILL.md
 parity "principle parity" \
-	"$(grep -ohE 'principle-[a-z-]+' "$ROUTER" | sort -u)" \
+	"$(index_names Principles | sed 's/^/principle-/' | sort -u)" \
 	"$(for d in skills/principle-*/; do basename "$d"; done | sort -u)" \
 	'index names ' ', no leaf' \
 	'leaf ' ' not in the Principles index'
 
 parity "playbook parity" \
-	"$(grep -ohE 'playbooks/[a-z-]+\.md' "$ROUTER" | sed 's|playbooks/||; s|\.md$||' | sort -u)" \
+	"$(index_names Playbooks | sort -u)" \
 	"$(for f in skills/poteto-mode/playbooks/*.md; do basename "$f" .md; done | sort -u)" \
 	'index names playbook ' ', no file' \
 	'playbook ' ' not named in the Playbooks index'

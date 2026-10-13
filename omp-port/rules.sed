@@ -85,6 +85,31 @@ s#After all Phase B candidates complete, choose an exact discovered judge agent 
 s#^- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line\. For an `auto` or `inherit-parent` entry, omit `model` so that reviewer runs on the parent model\.$#- `agent`: an exact discovered reviewer agent name. Its frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field#
 s#If the Task tool rejects a configured entry, run that reviewer on the table default of its family and say so\. Families go by prefix: `claude-\*`, `gpt-\*`, and `grok-\*`\. With no family match, use Reviewer A's default\. If it rejects a table default, check the valid slugs in the Task tool's error message, pick the closest equivalent \(prefer the highest-reasoning tier of the same family\), spawn with it, and open a separate PR to update the default table\. Do not block the review on the slug issue\. Never treat an alias entry as a rejected slug or apply either fallback to it\.#If the requested exact reviewer is absent, use another discovered reviewer with the same brief and report the missing model diversity. A model override cannot create an agent.#
 s#^4\. Pick the worker model from the `swarm workers` line in `~/\.cursor/rules/pstack-models\.mdc`\. If the rule or that line is missing, use `grok-[^`]+`\. For `auto` or `inherit-parent`, omit `model` so the workers run on the parent model\. If the Task tool rejects a slug, use the default and say so\. If it rejects the default, use the closest valid slug of the same family from its error message\. For a model race, name each arm's model up front\.#4. Pick exact discovered agent names. Inspect each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` for its model. A model race needs one loaded agent file and one exact override entry per arm; overrides cannot create agents.#
+# The Cursor wire fields, as tokens rather than as sentences. The sentence rules above carry the
+# meaning; this net is what keeps a Cursor field out of the tree when upstream rewords the
+# sentence those rules anchor on, which it does routinely. Each left side is a field name that
+# has no omp equivalent, so matching the token is always correct and never over-rewrites.
+s#`subagent_type: "([^"]+)"`#`agent`: `\1`#g
+s#`subagent_type`: `([^`]+)`#`agent`: `\1`#g
+s#`subagent_type`#`agent`#g
+s#subagent_type#agent#g
+s#`run_in_background: true`#one `task` call with all items in `tasks[]`#g
+s#`readonly: true`#read-only posture carried in the brief#g
+s#`readonly: false`#full tools per spawn#g
+s#agent mode \(`readonly: false`\)#full tools per spawn#g
+s#`readonly`: `true`#read-only posture carried in the brief#g
+s#`run_in_background: true`#one `task` call with all items in `tasks[]`#g
+s#readonly strips MCPs\.#nothing strips MCPs here.#g
+# A judge is spawned with read posture in its brief, never as a field. Matched on the field name
+# rather than the sentence, because upstream rewords the sentence and the field never survives it.
+s#Spawn one readonly judge subagent on that model\.#Start one judge in one `task` call with one item in `tasks[]`, the required shared `context`, and a brief that grants read tools only.#
+# `model`: the <role> line -> the agent that role names. Same reason: the field has no omp wire
+# equivalent, so replacing the token is always right and never over-rewrites.
+s#`model`: the `([^`]+)` line#`agent`: an exact discovered \1 agent#g
+s#`model` from the `([^`]+)` line#`agent` from the `task.agentModelOverrides` entry for an exact discovered \1 agent#g
+# A single spawn still uses the batch shape: one call, one item, one shared context.
+s#Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently#Assign one investigator to each category that has a matching MCP, in one `task` call with all items in `tasks[]` and the required shared `context` so they run concurrently#
+s#Spawn one synthesizer\.#Start one synthesizer in one `task` call with one item in `tasks[]` and the required shared `context`.#
 # Inline selectors that survive into patch context are exact values, not a Markdown catch-all.
 s#`subagent_type: "poteto-agent"`#`agent`: `poteto-agent`#g
 s#Shape: one or two questions with 4-6 options each, `allow_multiple: true` for category questions\.#Shape: one or two questions with 4-6 options each. Put `multi: true` on each category question object.#
@@ -266,7 +291,43 @@ s#Before spawning investigators, list the available MCPs from the Cursor environ
 s#Agents are spawned, resumed, and drained only through the Task tool\.#Agents are spawned and drained only through the Task tool, and resumed only through `write agent://<id>` messaging.#
 # Bugbot is a Cursor product, so the rubric names what plays its part on omp.
 s#^Use this reference when the Babysit playbook \(`\.\./playbooks/babysit\.md`\) handles Bugbot or review-automation comments\.#Use this reference when the Babysit playbook (`../playbooks/babysit.md`) handles Bugbot or review-automation comments. Bugbot is Cursor's hosted review product, so without it this rubric applies to whatever review bot posts on your PRs, including omp's own `security-reviewer`.#
-# Net for any Cursor home path a later upstream commit introduces.
+s#`,? in place of the `(arena|architect|swarm|interrogate) reviewers?` line##g
+s#the `arena cross-judge pool` line in the `pstack-models\.mdc` rule#an exact discovered judge agent whose configured model differs from the parent's when the roster provides one#g
+s#the `(architect|arena|swarm|interrogate) runners` line in the `pstack-models\.mdc` rule#the exact discovered runner agents#g
+s#the `interrogate reviewers` line in the `pstack-models\.mdc` rule#one exact discovered reviewer agent per configured entry#g
+s#the `arena cross-judge pool` line in `~?/?\.cursor/rules/pstack-models\.mdc`#an exact discovered judge agent whose configured model differs from the parent's when the roster provides one, in `~/.omp/agent/config.yml`#g
+s#the `(architect|arena|swarm|interrogate) runners` line in `~?/?\.cursor/rules/pstack-models\.mdc`#the exact discovered runner agents in `~/.omp/agent/config.yml`#g
+s#the `interrogate reviewers` line in `task\.agentModelOverrides` in `~/\.omp/agent/config\.yml`#one exact discovered reviewer agent per entry in `~/.omp/agent/config.yml`#g
+# The last two Cursor role labels. Same reasoning as the runner lines above: the label is a key
+# in a rule file that omp does not have, so naming it names nothing. The capability it stood for
+# is what the port writes instead.
+s#the `how (explorer|explainer)` line#an exact discovered \1 agent in `~/.omp/agent/config.yml`#g
+s#one per entry on the `interrogate reviewers` line in `~?/?(\.cursor/rules/pstack-models\.mdc|task\.agentModelOverrides in ~?/?\.omp/agent/config\.yml)`#one per configured entry in `~/.omp/agent/config.yml`#g
+s#Set `model` to that line.s value, or to the default if the rule or the line is missing\.#Each discovered agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects its model; the item has no `model` field.#g
+s#Leave `model` unset when the value is `auto` or `inherit-parent`\.#An `auto` or `inherit-parent` entry means the parent chat model, so omit that role from the map.#g
+s#the `interrogate reviewers` line in `task\.agentModelOverrides` in `~?/?\.omp/agent/config\.yml`#one exact discovered reviewer agent per configured entry in `~/.omp/agent/config.yml`#g
+s#the `architect runners` line in the `task\.agentModelOverrides` entries in `~/\.omp/agent/config\.yml`#the same exact discovered runner agents Arena uses, with the architect role in each brief, in `~/.omp/agent/config.yml`#g
+s#an exact discovered (why investigators|why synthesizer|interrogate reviewers|swarm workers|architect runners|arena runners|arena cross-judge pool|reflect tooling|reflect judgment, divergent, synthesizer) agent#an exact discovered agent filling that role#g
+s#one per entry on one exact discovered reviewer agent per entry#one per configured entry#g
+# A single spawn is still one task call with one item and the required shared context. Matched on
+# the "spawn one <role>" phrase, which is the shape upstream uses everywhere it means one worker,
+# rather than on the sentence around it.
+s#([Ss]pawn) one ([a-z]+)#\1 one \2 in one `task` call with one item in `tasks[]` and the required shared `context`#g
+s#, in place of the .(arena|architect|swarm|interrogate) runners. line#.#g
+s#`agent`: an exact discovered (how explorer|how explainer) (agent|line)#`agent`: an exact discovered agent filling that role#g
+
+# Net for any Cursor home path a later upstream commit introduces. The model-rule file is named
+# before the general net because omp has no rules directory: a specific rule that missed on a
+# reworded sentence used to leave this for the net to turn into a path that resolves to nothing.
+# The role label is Cursor's key name and dies with Cursor's rule file. omp keys the map by exact
+# agent name, so "the `arena runners` line" names a key that does not exist, and calling it an
+# agent is just as wrong. Point at the capability instead: resolve exact discovered runner agents
+# and let each one's frontmatter or task.agentModelOverrides entry pick its model. This runs
+# before the path rules below so it still sees the upstream path.
+s#`~?/?\.cursor/rules/pstack-models\.mdc`#`task.agentModelOverrides` in `~/.omp/agent/config.yml`#g
+# The same file named without a path, which upstream does in the sentences above. Pointing it at
+# the config is correct whether or not a path was written, so this matches the bare name too.
+s#the `pstack-models\.mdc` rule#the `task.agentModelOverrides` entries in `~/.omp/agent/config.yml`#g
 s#~/\.cursor/#~/.omp/#g
 
 ## 9. Install paths. pstack is vendored in Cursor's monorepo and installed as a plugin on omp.
@@ -296,18 +357,15 @@ s#Reviewers return findings in the `Task` response body\.#Reviewers return findi
 s#Use Glob to find directories and files, Grep to find key symbols, Read to understand#Use `glob` to find directories and files, `grep` to find key symbols, `read` to understand#
 s#Use Read, Grep, and Glob as needed\.#Use `read`, `grep`, and `glob` as needed.#
 s#Subagents inherit it\. Multiple `Task` calls on the same branch each get their own worktree#A worker shares the parent's checkout unless its spawn sets `isolated: true` where the live schema exposes it, so give every concurrent writer its own worktree explicitly#
-# omp registers one slash command per skill as /skill:<name>; a bare /how is not a command on
-# this harness. /poteto-mode is excluded because the port's own extension registers that one.
-s#`/no-comments`#`/skill:no-comments`#g
-s#`/unslop`#`/skill:unslop`#g
-s#`/create-verification-skill`#`/skill:create-verification-skill`#g
-s#`/maintain-verification-skill`#`/skill:maintain-verification-skill`#g
-s#`/architect`#`/skill:architect`#g
-s#`/why`#`/skill:why`#g
-s#`/how`#`/skill:how`#g
-s#/create-verification-skill#/skill:create-verification-skill#g
-s#/maintain-verification-skill#/skill:maintain-verification-skill#g
-s#`/technical-writing`#`skill://technical-writing`#g
+# omp registers one slash command per skill as /skill:<name>; a bare /how is not a command on this
+# harness. `/poteto-mode` is in the alternation only because the gate scans for it like any other
+# name; the port's own extension registers that command, so the rewrite is a no-op in practice.
+#
+# One rule covers every name rather than one rule per skill. The per-skill form was a list that
+# forgot: upstream added eighteen skills after it was written and every one of them shipped a bare
+# /name the gate could not accept. Adding a skill upstream now means adding its name to the
+# alternation, once.
+s#`/(teach|recall|reflect|tdd|swarm|arena|interrogate|correct|setup-pstack|automate-me|figure-it-out|show-me-your-work|benchmark-checklist|blast-radius|ketchup|bro|make-bot-ui|poteto-help|no-comments|unslop|create-verification-skill|maintain-verification-skill|architect|why|how|technical-writing|typescript-best-practices|poteto-mode|principle-[a-z-]+)`#`/skill:\1`#g
 # One verdict vocabulary. pstack-omp and swarm both name PASS/ISSUES/BLOCKED; shipping named a
 # different three, and its landing rule tested for a different set, so a verifier told by one file
 # and checked by another could not satisfy both.

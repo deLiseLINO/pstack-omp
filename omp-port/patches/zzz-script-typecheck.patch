@@ -1,15 +1,11 @@
 diff --git a/skills/poteto-mode/scripts/package.json b/skills/poteto-mode/scripts/package.json
 --- a/skills/poteto-mode/scripts/package.json
 +++ b/skills/poteto-mode/scripts/package.json
-@@ -4,7 +4,7 @@
-   "type": "module",
-   "scripts": {
-     "test": "bun test orch watch-pr",
+@@ -6,3 +6,3 @@
 -    "typecheck": "tsc --project watch-pr/tsconfig.json --noEmit --strict"
 +    "typecheck": "tsc --project tsconfig.json --noEmit --strict"
    },
    "dependencies": {
-     "commander": "14.0.0"
 diff --git a/skills/poteto-mode/scripts/tsconfig.json b/skills/poteto-mode/scripts/tsconfig.json
 new file mode 100644
 --- /dev/null
