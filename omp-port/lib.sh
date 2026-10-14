@@ -139,9 +139,8 @@ install_tree() {
 	done < <(owned_paths)
 	rm -rf "$REPO_ROOT/plugins/pstack/skills" "$REPO_ROOT/plugins/pstack/agents" || return 1
 	mv "$work/skills" "$work/agents" "$REPO_ROOT/plugins/pstack/" || return 1
-	# The Agent Plugins manifest travels with the tree. Upstream added it so the plugin loads in any
-	# harness, and it is pure metadata, so it needs no substitution: dropping it would leave the port
-	# carrying the omp half of a portable plugin and discarding the portable half.
+	# Copied verbatim: upstream added this so the plugin loads in any harness, and it is pure
+	# metadata, so there is nothing in it to substitute.
 	if [ -f "$work/plugin.json" ]; then
 		cp -a "$work/plugin.json" "$REPO_ROOT/plugins/pstack/plugin.json" || return 1
 	fi

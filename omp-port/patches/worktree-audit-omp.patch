@@ -37,13 +37,12 @@
  #
  # Usage: worktree-audit.sh [-b|--base <ref>] [repo-path]
  #   repo-path defaults to the current repo.
-@@ -28,7 +28,13 @@
+@@ -28,7 +28,12 @@
  git rev-parse --git-dir >/dev/null 2>&1 || { echo "error: not a git repo: $repo" >&2; exit 1; }
  
  # Main worktree is the first entry; everything else is a candidate.
 -main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
-+# Main worktree is the first entry; everything else is a candidate. Strip the
-+# record prefix rather than splitting fields so paths containing spaces survive.
++# Strip the record prefix rather than splitting fields, so a path with spaces survives.
 +if ! worktree_records=$(git worktree list --porcelain); then
 +	echo "could not inspect git worktrees" >&2
 +	exit 1
@@ -52,7 +51,7 @@
  
  if [ -z "$base" ]; then
  	for cand in "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" origin/main origin/master; do
-@@ -50,7 +56,10 @@
+@@ -50,7 +55,10 @@
  # PR state by branch, fetched once as [{number, state, head}] with a lowercase
  # state. Origin when its CLI can read this repo's PRs, otherwise gh. Empty when
  # neither can.
@@ -64,17 +63,15 @@
  if command -v origin >/dev/null 2>&1 \
  	&& raw=$(origin pr list --author "@me" --state all --limit 1000 \
  		--json number,status,headRef 2>/dev/null); then
-@@ -61,19 +70,41 @@
+@@ -61,19 +69,39 @@
  fi
  [ -s "$prs" ] || echo "[]" > "$prs"
  
 -# Transcripts dir: ~/.omp/projects/<slugified-repo-path>/agent-transcripts.
 -slug=$(printf '%s' "$main_wt" | sed 's#^/##; s#/#-#g')
 -transcripts="$HOME/.cursor/projects/$slug/agent-transcripts"
-+# omp keys each session tree by cwd, the path with $HOME stripped and "/" rewritten
-+# as "-". A chat launched inside a worktree lands in that worktree's own bucket, so
-+# scan both and nothing else; walking every bucket scales with total omp history
-+# instead of this repo's.
++# omp keys each session tree by cwd. Scan this worktree's bucket and the repo's; walking every
++# bucket would scale with total session history.
 +sessions="${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions"
 +bucket() { printf '%s/%s' "$sessions" "$(printf '%s' "${1#"$HOME"}" | sed 's#/#-#g')"; }
 +repo_bucket=$(bucket "$main_wt")
@@ -84,10 +81,10 @@
  echo "# base: $base"
 -printf "SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE\n"
 +printf "SIZE\tAGE\tMERGED\tDIRTY\tLOCKED\tINSPECT\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE\n"
-+
-+printf '%s\n' "$worktree_records" | awk '/^worktree /{sub(/^worktree /, ""); print}' | while IFS= read -r wt; do
  
 -git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
++printf '%s\n' "$worktree_records" | awk '/^worktree /{sub(/^worktree /, ""); print}' | while IFS= read -r wt; do
++
 +	inspect=ok
 +	lock=$(printf '%s\n' "$worktree_records" | awk -v target="$wt" '
 +		BEGIN { RS=""; FS="\n" }
@@ -112,7 +109,7 @@
  	head_ts=$(git -C "$wt" log -1 --format='%ct' HEAD 2>/dev/null || echo 0)
  	age=$([ "$head_ts" -gt 0 ] 2>/dev/null && echo "$(( (now - head_ts) / 86400 ))d" || echo "?")
  
-@@ -82,8 +113,10 @@
+@@ -82,8 +110,10 @@
  	git merge-base --is-ancestor "$head" "$base" 2>/dev/null && merged=YES || merged=no
  
  	# Distinguish real WIP (tracked edits) from disposable untracked scratch.
@@ -125,7 +122,7 @@
  	elif printf '%s\n' "$porcelain" | grep -qv '^??'; then
  		dirty="wip:$(printf '%s\n' "$porcelain" | grep -cv '^??')"
  	else dirty="scratch:$(printf '%s\n' "$porcelain" | grep -c '^??')"; fi
-@@ -103,24 +136,33 @@
+@@ -103,24 +133,33 @@
  	# Most recent chat whose transcript operated in this worktree. Match path
  	# followed by "/" or a quote so glint-482 does not match glint-482-r37.
  	last="-"; last_ts=0

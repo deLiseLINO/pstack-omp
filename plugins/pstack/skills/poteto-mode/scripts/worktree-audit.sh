@@ -28,8 +28,7 @@ cd "$repo" || exit 1
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "error: not a git repo: $repo" >&2; exit 1; }
 
 # Main worktree is the first entry; everything else is a candidate.
-# Main worktree is the first entry; everything else is a candidate. Strip the
-# record prefix rather than splitting fields so paths containing spaces survive.
+# Strip the record prefix rather than splitting fields, so a path with spaces survives.
 if ! worktree_records=$(git worktree list --porcelain); then
 	echo "could not inspect git worktrees" >&2
 	exit 1
@@ -70,10 +69,8 @@ elif raw=$(gh pr list --author "@me" --state all --limit 1000 \
 fi
 [ -s "$prs" ] || echo "[]" > "$prs"
 
-# omp keys each session tree by cwd, the path with $HOME stripped and "/" rewritten
-# as "-". A chat launched inside a worktree lands in that worktree's own bucket, so
-# scan both and nothing else; walking every bucket scales with total omp history
-# instead of this repo's.
+# omp keys each session tree by cwd. Scan this worktree's bucket and the repo's; walking every
+# bucket would scale with total session history.
 sessions="${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions"
 bucket() { printf '%s/%s' "$sessions" "$(printf '%s' "${1#"$HOME"}" | sed 's#/#-#g')"; }
 repo_bucket=$(bucket "$main_wt")
