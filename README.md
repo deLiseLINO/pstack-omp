@@ -4,13 +4,11 @@ An omp marketplace carrying two plugins.
 
 `pstack` is Lauren Tan's engineering methodology for Cursor, ported to oh-my-pi and made
 model and provider agnostic, 56 skills with 23 playbooks and 24 principle leaves.
-`fan-out` is a small omp-native skill for wide parallel runs, written from measurement
-rather than doctrine.
+Wide parallel runs are a `swarm` dispatch, not a separate plugin.
 
 ```
 /marketplace add negoro26/pstack-omp
 /marketplace install pstack@pstack-omp
-/marketplace install fan-out@pstack-omp
 ```
 
 The marketplace install loads the skills and the `potetomode` extension. It does not load

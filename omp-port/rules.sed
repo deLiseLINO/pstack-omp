@@ -482,10 +482,6 @@ s#(open files, recent edits, cursor location, what was just discussed)#(open fil
 # (omp://system-prompt-customization.md). The real restriction on `scout` is the tool set, not MCP.
 s#The strict `scout` definition has no MCP grant, so never assign MCP work to it\.#The strict `scout` definition has no write tools, so keep it off any lane that must edit. Its MCP tools are inherited: a task agent's `tools:` list does not remove them.#
 s#an exact discovered full-access worker for citation spot-checks that call MCP\. The strict `scout` definition cannot serve that lane\.#an exact discovered full-access worker for citation spot-checks that call MCP. `scout` inherits MCP tools and can serve that lane, but it cannot write.#
-
-# `spawn on a fast, cheap model` asks for a per-spawn knob the task tool does not have. Every
-# sibling fan-out skill states the real mechanism; this one kept the Cursor-era phrasing.
-
 # `subagents/` is a Cursor transcript layout level. On omp the third level is
 # `<session-stem>/<AgentId>/<AgentId>.<Step>.jsonl`, and the prescribed glob matched 0 files against
 # 181 that exist. The prose one line below was corrected; the command was not.
