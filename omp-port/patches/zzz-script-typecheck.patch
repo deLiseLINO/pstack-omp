@@ -1,0 +1,26 @@
+diff --git a/skills/poteto-mode/scripts/package.json b/skills/poteto-mode/scripts/package.json
+--- a/skills/poteto-mode/scripts/package.json
++++ b/skills/poteto-mode/scripts/package.json
+@@ -6,3 +6,3 @@
+-    "typecheck": "tsc --project watch-pr/tsconfig.json --noEmit --strict"
++    "typecheck": "tsc --project tsconfig.json --noEmit --strict"
+   },
+   "dependencies": {
+diff --git a/skills/poteto-mode/scripts/tsconfig.json b/skills/poteto-mode/scripts/tsconfig.json
+new file mode 100644
+--- /dev/null
++++ b/skills/poteto-mode/scripts/tsconfig.json
+@@ -0,0 +1,13 @@
++{
++  "compilerOptions": {
++    "allowImportingTsExtensions": true,
++    "module": "esnext",
++    "moduleResolution": "bundler",
++    "noEmit": true,
++    "skipLibCheck": true,
++    "strict": true,
++    "target": "esnext",
++    "types": ["bun-types"]
++  },
++  "include": ["bootstrap.ts", "orch/**/*.ts", "watch-pr/**/*.ts"]
++}

@@ -5,30 +5,125 @@
 # mechanic it maps to. This file replaces PORTING.md's substitution table: the table is here now.
 # Order is load-bearing in three places, each marked below.
 #
-# Prose the port adds on top of these rewrites lives in plugins/pstack/skills/omp-mechanics.
-# Script changes live in omp-port/patches. Neither belongs here.
+# Owned prose lives in the three skill paths named by omp-port/owned.txt. Script changes live in
+# omp-port/patches. Neither belongs here.
 
 ## 1. Whole-sentence rewrites, which must read raw upstream text before any token rule edits it.
 
-# Cursor's reasoning-effort ladder over its own slug names -> a selector omp models reports.
-s#So `small` turns `claude-[a-z0-9.-]+` into `claude-[a-z0-9.-]+`, and `grok-[a-z0-9.-]+` into `[a-z0-9.-]+` when only that form is detected\.#So `small` takes the lowest-effort selector in the same family that `omp models` reports, and marks the role as needing a choice when that family offers none.#
-# Cursor's multi-slug review panel -> one model per family, resolved at run time (backticked form).
-s#(`claude-[a-z0-9.-]+`, `gpt-[a-z0-9.-]+`, `grok-[a-z0-9.-]+`(, `claude-[a-z0-9.-]+`)?|`claude-fable-5-1-thinking-max`, `gpt-5\.6-sol-max`, `grok-4\.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`)#one model per distinct family `omp models` reports#g
-# Same panel in the bare rule-file form, where the slugs carry no backticks.
-s#(claude-[a-z0-9.-]+, gpt-[a-z0-9.-]+, grok-[a-z0-9.-]+(, claude-[a-z0-9.-]+)?|claude-fable-5-1-thinking-max, gpt-5\.6-sol-max, grok-4\.6-fast-xhigh, claude-opus-5-thinking-xhigh)#one model per distinct family omp models reports#g
+# Cursor's reasoning-effort ladder over its own slug names -> a selector omp models reports. The
+# left-hand side is upstream's sentence as it stands at the pin, nothing more: it used to end "when
+# only that form is detected.", a clause upstream dropped, and the rule then matched nothing at all
+# while sed still exited 0. That is the whole failure this gate exists to catch, caught here by
+# rewriting the left-hand side rather than by adding an exemption, because the translation it
+# carries is still wanted and the replacement text was already sitting unused below.
+s#So `small` turns `claude-[a-z0-9.-]+` into `claude-[a-z0-9.-]+`, and `grok-[a-z0-9.-]+` into `grok-[a-z0-9.-]+`\.#So `small` takes the lowest-effort selector in the same family that `omp models` reports, and marks the role as needing a choice when that family offers none.#
 # Cursor names the judgment slug twice in one clause; omp names the capability once.
 s#go to your strongest judgment model \(`claude-[a-z0-9.-]+`\)#go to your strongest judgment model#
-# Cursor lists its spawn parameters inline; on omp the whole list is one batched task call.
-s#Spawn all N workers in one message with `subagent_type: generalPurpose`, `environment: "cloud"`, `run_in_background: true`, and the configured model\. Use `environment: "local"` only when the worker needs access to something on the user's computer\.#Spawn all N workers in one `task` call with all items in `tasks[]`, each item `agent`: `task` (omp's general-purpose bundled agent) with `isolated: true`. Every worker runs on this machine, so read `skill://omp-mechanics` for the isolation gate and the per-worker output fallback.#
-s#Spawn all N subagents in one message with `run_in_background: true`, each with#Spawn all N subagents in one `task` call with all items in `tasks[]`, each with#
-s#One message, three `Task` calls, `subagent_type: generalPurpose`, (explicit `model:` on each|with `model` set as below), agent mode \(`readonly: false`\)\.#One `task` call with three items in `tasks[]`, each `agent`: `task` (omp's general-purpose bundled agent) pinned by its own agent name, full tools per spawn. Run the three lenses on three different model families where `omp models` offers them, and keep Divergent on a different model family from Judgment, since the lens earns its name from different priors and not a different prompt.#
-# A diverse-model review is a property of the reviewers, so each skill states it in its own steps.
-s#extending or shrinking the Reviewer [A-Z/]+ labels below to the configured entry count\. (Otherwise|If the rule or that line is missing,) use the table defaults\.#extending or shrinking the Reviewer A/B/C/D labels below to the configured entry count. Otherwise use the table defaults. Give each reviewer a different model family from the other reviewers and from the parent that wrote the code, resolved at run time from what `omp models` reports. A reviewer sharing the writer's family shares the writer's blind spots, which is the one thing this skill exists to defeat. `skill://omp-mechanics` covers the single-family case.#
 # Cursor reads the playbook from trunk because it is vendored there; omp reads the install.
 s#Read these from trunk at program start\. Re-read them at every tick\.#Read these at program start and re-read them at every tick. The install on disk is authoritative, not a remote ref.#
-# Cursor's rule file is the artifact step 5 writes; omp's is a keyed map in its own config.
-s#Write `~/\.cursor/rules/pstack-models\.mdc`, an always-applied rule that sets pstack's model per role\.#Write `task.agentModelOverrides` in `~/.omp/agent/config.yml`, the keyed override map that sets pstack's model per role agent. The chat model stays the operator's choice, made with `/model`, and pstack never overrides it. `skill://omp-mechanics` holds the file shape.#
-s|Write `~/\.cursor/rules/pstack-models\.mdc` with `alwaysApply: true`, a `# budget` line with the chosen label and its target effort, and one line per role, using the same labels poteto-mode uses. Overwrite the whole file so re-runs stay idempotent. Shape:|Write `task.agentModelOverrides` and `modelRoles` in `~/.omp/agent/config.yml`, with a `# budget` comment carrying the chosen label and its target effort, and one entry per role agent, using the same labels poteto-mode uses. Overwrite the whole pstack part of both maps so re-runs stay idempotent. The block below is the role-to-capability table and not the file format, which `skill://omp-mechanics` holds. Shape:|
+# Router prose that used Cursor's local links or per-call model paragraph.
+s#Prototype playbook \(`playbooks/prototype\.md`\)#Prototype playbook (`skill://poteto-mode/playbooks/prototype.md`)#
+s#\*\*Babysit\*\* playbook \(`playbooks/babysit\.md`\)#**Babysit** playbook (`skill://poteto-mode/playbooks/babysit.md`)#
+s#\*\*Shipping\*\* playbook \(`playbooks/shipping\.md`\)#**Shipping** playbook (`skill://poteto-mode/playbooks/shipping.md`)#
+s#`references/bugbot-triage\.md`#`skill://poteto-mode/references/bugbot-triage.md`#
+s#^\*\*Use `subagent_type: "poteto-agent"` for any subagent you spawn inside a playbook step\*\*.*$#`poteto-mode` selects the playbook, step order, canonical role, and lifecycle protocol. `skill://pstack-omp` is authoritative for every delegation instruction in this catalog, including imported task-shaped examples. Resolve roles against the live roster; bundled agent names are optional, never mandatory. Only pass fields exposed by the current tool schema.#
+s#^\*\*Defaults for every `Task` call\.\*\* `run_in_background: true`.*Prose and judgment read `judgment and prose`\.$#Batch genuinely independent work when supported. Give each participant a standalone brief and explicit write ownership. The root starts additional participants and independent reviewers; ordinary workers do not start children. Runtime role configuration selects models. Preserve required independent contexts and report unavailable model diversity honestly. Do not change operator configuration merely to satisfy a skill example.\n\nModel selection belongs to `task.agentModelOverrides` and agent frontmatter, not to routed-skill task fields.#
+# Autonomous run's exact post-Cursor workflow.
+s#^\*\*You own the exit condition\. Define done, then drive to it without stopping\.\*\*$#**You own the exit condition. Define done, then drive to it without stopping.** For "going to bed", "run until done", or "continue until X".#
+s#^1\. State the exit condition as a checkable predicate before the first iteration \(tests green, repro fixed, all N PRs merged, pixel-diff zero\)\.$#1. State the exit condition as a checkable predicate before the first iteration (tests green, repro fixed, all N PRs merged, pixel-diff zero). A vague goal stalls; a predicate lets you stop.#
+s#^4\. Mid-run discoveries are yours\..*Keep the predicate as the main drive, and return to it after each side fix\.$#4. Mid-run discoveries are yours. Address broken skills, related bugs, flaky verifiers, review noise, tooling failures, orphaned follow-ups, and fixable drift yourself via poteto-mode. Put out-of-band fixes in their own PR. Do not park reversible work for the human or open a user question. Surface only irreversible actions, genuine product or preference calls no experiment can settle, or a real dead end. Keep the predicate as the main drive, and return to it after each side fix.#
+s#^5\. Checkpoint every iteration via the \*\*show-me-your-work\*\* skill, a row for what changed and whether the predicate moved\.$#5. Checkpoint every iteration via the **show-me-your-work** skill, a row for what changed and whether the predicate moved. A run with no trail can't be audited or resumed.#
+# Cursor's model paragraph -> exact discovered agents and runtime-selected models.
+s#Each spawn below names a role line in the `pstack-models\.mdc` rule and a default\. Set `model` to that line's value, or to the default if the rule or the line is missing\. Leave `model` unset when the value is `auto` or `inherit-parent`\. If the Task tool rejects a slug, use the default and say so\. If it rejects the default, use the closest valid slug of the same family from its error message\.#Resolve agents against the live roster. Use an exact preferred agent only when it is present; otherwise follow the workflow's default-worker fallback. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects its model; the task item has no `model` field.#
+# Exact role bullets carry the agent choice. No broad Markdown token rule is needed.
+s#^- `model`: the `how explorer` line, default `[^`]+`$#- `agent`: an exact discovered scout for repository-only exploration#
+s#^- `model`: the `how explainer` line, default `[^`]+`$#- `agent`: an exact discovered explainer only when the live roster has one; otherwise omit `agent` for the default worker. Use the explainer and read-only brief in both cases. An override cannot create an agent.#
+s#^- `model`: the `why investigators` line, default `[^`]+`$#- `agent`: an exact discovered full-access worker for every MCP-backed lane. The strict `scout` definition has no MCP grant, so never assign MCP work to it. A repository-only lane may use `scout` only when its file-only grant covers the evidence. Use another discovered worker when the lane needs `git`, `gh`, or other shell tools.#
+s#^- `model`: the `why synthesizer` line, default `[^`]+`$#- `agent`: an exact discovered full-access worker for citation spot-checks that call MCP. The strict `scout` definition cannot serve that lane.#
+# Cursor role-model defaults do not name loaded agents on omp.
+s#Delegate implementation to a subagent using your configured bug-fix model \(default `[^`]+`\) with a specific scope\.#Delegate implementation to exact discovered writable implementer agents whose frontmatter or `task.agentModelOverrides[<exact-name>]` selects each model. The task item has no `model` field. Prefer distinct configured model families only when the operator's model policy and roster supply them; otherwise keep the exact agents and report weaker model diversity, with a specific scope.#
+s#Delegate code-writing to a subagent using your configured feature model \(default `[^`]+`\) with a specific scope#Delegate code-writing to exact discovered writable implementer agents whose frontmatter or `task.agentModelOverrides[<exact-name>]` selects each model. The task item has no `model` field. Prefer distinct configured model families only when the operator's model policy and roster supply them; otherwise keep the exact agents and report weaker model diversity, with a specific scope#
+s#Hand the change to a subagent using your configured hillclimb model \(default `[^`]+`\) with a tight scope\.#Hand the change to exact discovered writable implementer agents whose frontmatter or `task.agentModelOverrides[<exact-name>]` selects each model. The task item has no `model` field. Prefer distinct configured model families only when the operator's model policy and roster supply them; otherwise keep the exact agents and report weaker model diversity, with a tight scope.#
+s#Delegate implementation to a subagent using your configured perf-issue model \(default `[^`]+`\)\.#Delegate implementation to exact discovered writable implementer agents whose frontmatter or `task.agentModelOverrides[<exact-name>]` selects each model. The task item has no `model` field. Prefer distinct configured model families only when the operator's model policy and roster supply them; otherwise keep the exact agents and report weaker model diversity.#
+s#Delegate the mechanical edits to a subagent using your configured refactoring model \(default `[^`]+`\) with a specific scope#Delegate the mechanical edits to exact discovered writable implementer agents whose frontmatter or `task.agentModelOverrides[<exact-name>]` selects each model. The task item has no `model` field. Prefer distinct configured model families only when the operator's model policy and roster supply them; otherwise keep the exact agents and report weaker model diversity, with a specific scope#
+# These exact task fields have no omp wire equivalent. The role bullet above is the agent choice.
+/^- `subagent_type`: `generalPurpose`$/d
+s#^- `readonly`: `true`$#- read-only posture. The brief grants only the tools the discovered agent actually has and forbids writes#
+s#^- `readonly`: `false` \(agent mode\)\. \*\*Do not use readonly/Ask mode\.\*\* It strips MCP access, which disables MCP-backed investigators entirely\. Investigators still shouldn't write anything\.$#- read-only posture. The brief grants only the tools the discovered agent actually has and forbids file writes, git state changes, commits, pushes, pull requests, and external mutations#
+s#^- `readonly`: `false` \(agent mode\)\. The synthesizer's quality check spot-verifies citations, which can require MCP access\. Readonly/Ask mode strips MCPs and defeats that\.$##
+s#Work like a careful, cautious, precise investigator\.#Work like a careful, cautious, precise investigator. This investigation is read-only: do not write files, change git state, commit, push, open pull requests, or mutate any external system. Use only read-only operations exposed by your agent and assigned source.#
+# One-item calls still use the live batch shape and required shared context.
+s#Spawn one Task subagent that explores and explains in one pass:#Start one direct explainer in one `task` call with one item in `tasks[]` and the required shared `context`:#
+s#Once all explorers have returned, spawn one Task subagent to synthesize their findings into one explanation:#After all explorers have returned, start the synthesis in one `task` call with one item in `tasks[]` and the required shared `context`, using Step 2b's explainer routing:#
+s#Spawn one synthesizer subagent:#Start one synthesizer in one `task` call with one item in `tasks[]`, the required shared `context`, and an exact discovered full-access worker:#
+s#Spawn all explorers in a single message:#Spawn all explorers in one `task` call with the required shared `context` and all items in `tasks[]`:#
+s#Launch all matching investigators in a single message so they run concurrently\.#Launch all matching investigators in one `task` call with the required shared `context` and all items in `tasks[]` so they run concurrently.#
+s#^Launch all reviewers in a single message using the Task tool\. Use the `interrogate reviewers` line in `~/\.cursor/rules/pstack-models\.mdc`, one reviewer per entry, extending or shrinking the Reviewer A/B/C labels below to the configured entry count\. If the rule or that line is missing, use the table defaults\.$#Launch all reviewers in one `task` call with the required shared `context` and all items in `tasks[]`. Resolve exact discovered reviewer agent names, use one agent per reviewer slot, and report when the live roster cannot provide the requested model-family diversity.#
+# Cursor's per-reviewer opening becomes one reviewed batch.
+s#^Spawn one reviewer per configured model to adversarially review code changes\. Each model gets the same prompt and rubric\.#Use exact discovered reviewer agents, one per configured family, in one `task` call with all items in `tasks[]` and the required shared `context`. Each reviewer gets the same prompt and rubric.#
+s#Spawn all N subagents in one message with `run_in_background: true`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale\.#Spawn all N subagents in one `task` call with all items in `tasks[]` and the required shared `context`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.#
+s#Spawn all N workers in one message with `subagent_type: generalPurpose`, `environment: "cloud"`, `run_in_background: true`, and the step 4 model, left unset for `auto` or `inherit-parent`\. Use `environment: "local"` only when the worker needs access to something on the user's computer\.#Start all N workers in one `task` call. Put every item in `tasks[]` and pass the required shared `context`; set `isolated: true` only when the live task schema exposes it and the runtime's isolation settings allow it. Otherwise give each writer an explicit separate worktree or output directory.#
+s#One message, three `Task` calls, `subagent_type: generalPurpose`, (explicit `model:` on each|with `model` set as below), agent mode \(`readonly: false`\)\.#One `task` call with three items in `tasks[]` and one required shared `context`, each item using an exact discovered agent name. Full tools per spawn. Run the three lenses on three different configured model families where available, and keep Divergent on a different model family from Judgment, since the lens earns its name from different priors and not a different prompt. Reviewers need full tools for MCP lookups (tickets, chat threads, observability traces referenced in the transcript); there is no task `readonly` field.#
+s#Each reviewer and the synthesizer name a role line in the `pstack-models\.mdc` rule and a default\. Set `model` to that line's value, or to the default if the rule or the line is missing\. Leave `model` unset when the value is `auto` or `inherit-parent`\. If the Task tool rejects a slug, use the default and say so\. If it rejects the default, use the closest valid slug of the same family from its error message\.#Resolve exact discovered agent names for the three lenses and the synthesizer. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field.#
+s#One `Task` call, `subagent_type: generalPurpose`, with `model` from the `reflect judgment, divergent, synthesizer` line \(default `[^`]+`\), agent mode \(`readonly: false`\)\.#One `task` call with one item in `tasks[]`, the required shared `context`, and an exact discovered synthesizer agent name. Its frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field. The synthesizer needs full tools for citation spot-checks; there is no task `readonly` field.#
+# Remove the old MCP-mode claims left after the task-call rewrite.
+s#Reviewers need MCP access for context lookups \(tickets, chat threads, observability traces referenced in the transcript\)\. Readonly strips MCPs\.##
+s#The synthesizer's quality check includes spot-verifying citations, which can require MCP access\. Readonly strips MCPs\.##
+s#there is no task `readonly` field\.  Use#there is no task `readonly` field. Use#
+s#there is no task `readonly` field\.[[:space:]]*$#there is no task `readonly` field.#
+s#\| Lens \| Role line \| Default `model` \| Prompt template \|#| Lens | Exact agent | Prompt template |#
+s#^\| Judgment \| `reflect judgment, divergent, synthesizer` \| `[^`]+` \| `references/judgment-reviewer\.md` \|$#| Judgment | discovered judgment agent | `references/judgment-reviewer.md` |#
+s#^\| Tooling \| `reflect tooling` \| `[^`]+` \| `references/tooling-reviewer\.md` \|$#| Tooling | discovered tooling agent | `references/tooling-reviewer.md` |#
+s#^\| Divergent \| `reflect judgment, divergent, synthesizer` \| `[^`]+` \| `references/divergent-reviewer\.md` \|$#| Divergent | discovered divergent agent | `references/divergent-reviewer.md` |#
+s#The synthesizer returns a structured Accepted / Rejected / Backlog list\.#Pass this explicit `outputSchema` when the live task schema exposes it:\n\n```json\n{"type":"object","required":["Accepted","Rejected","Backlog"],"properties":{"Accepted":{"type":"array","items":{"type":"object","required":["Problem","Proposal","Routing"],"properties":{"Problem":{"type":"string"},"Proposal":{"type":"string"},"Routing":{"type":"string"}}}},"Rejected":{"type":"array","items":{"type":"object","required":["Principle","Reason"],"properties":{"Principle":{"type":"string"},"Reason":{"type":"string"}}}},"Backlog":{"type":"array","items":{"type":"object","required":["Pattern","Hit","Mechanism"],"properties":{"Pattern":{"type":"string"},"Hit":{"type":"string"},"Mechanism":{"type":"string"}}}}}}\n```#
+# These model-map sentences must match raw upstream before slug and path token rewrites.
+s#^Take the runners from the `architect runners` line in the `pstack-models\.mdc` rule, in place of the `arena runners` line\. If the rule or that line is missing, use `claude-opus-[^`]+`, `gpt-[^`]+`, `grok-[^`]+`\. Alias and rejected entries follow the runner rules in the \*\*arena\*\* skill's Phase A\.$#Use the same exact discovered runner agents as Arena, with the architect role in each brief. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects its model; the task item has no `model` field.#
+s#^3\. Pick the runners\. Use the `arena runners` line in `~/\.cursor/rules/pstack-models\.mdc`\. If the rule or that line is missing, default to one each on `claude-opus-[^`]+`, `gpt-[^`]+`, `grok-[^`]+`\. An `auto` or `inherit-parent` entry in this line or the cross-judge line means the parent model, so omit `model` for it\. If the Task tool rejects a configured entry, run that seat on its family's default and say so\. Families go by prefix: `claude-\*`, `gpt-\*`, and `grok-\*`\. With no family match, use `claude-opus-[^`]+`\. If it rejects a default, use the closest valid slug of the same family from its error message\.#3. Pick the runners. Resolve exact discovered agent names and inspect each agent's frontmatter or `task.agentModelOverrides[<exact-name>]`. Prefer distinct configured model families when the roster supplies them; otherwise keep the independent contexts and report weaker model diversity. A model override cannot create an agent.#
+s#After all Phase B candidates complete, choose one model from the `arena cross-judge pool` line in `~/.cursor/rules/pstack-models\.mdc`\. If the rule or that line is missing, choose from `claude-opus-[^`]+`, `gpt-[^`]+`, `grok-[^`]+`\. Prefer a different model family from the parent's\.#After all Phase B candidates complete, choose an exact discovered judge agent whose configured model differs from the parent's when the roster provides one.#
+# The judge is one task item, with posture in its brief rather than a task field.
+s#After all Phase B candidates complete, choose an exact discovered judge agent whose configured model differs from the parent's when the roster provides one\. Spawn one readonly judge subagent on that model\.#After all Phase B candidates complete, choose an exact discovered judge agent. Start the judge in one `task` call with one item in `tasks[]`, the required shared `context`, and that exact agent name. Its frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field. The brief carries read-only posture, grants only the tools that discovered agent actually has, forbids writes, and has no task `readonly` field. Prefer a different configured model family when the operator's model policy and roster supply one; otherwise keep the exact agent and report weaker model diversity.#
+s#^- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line\. For an `auto` or `inherit-parent` entry, omit `model` so that reviewer runs on the parent model\.$#- `agent`: an exact discovered reviewer agent name. Its frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field#
+s#If the Task tool rejects a configured entry, run that reviewer on the table default of its family and say so\. Families go by prefix: `claude-\*`, `gpt-\*`, and `grok-\*`\. With no family match, use Reviewer A's default\. If it rejects a table default, check the valid slugs in the Task tool's error message, pick the closest equivalent \(prefer the highest-reasoning tier of the same family\), spawn with it, and open a separate PR to update the default table\. Do not block the review on the slug issue\. Never treat an alias entry as a rejected slug or apply either fallback to it\.#If the requested exact reviewer is absent, use another discovered reviewer with the same brief and report the missing model diversity. A model override cannot create an agent.#
+s#^4\. Pick the worker model from the `swarm workers` line in `~/\.cursor/rules/pstack-models\.mdc`\. If the rule or that line is missing, use `grok-[^`]+`\. For `auto` or `inherit-parent`, omit `model` so the workers run on the parent model\. If the Task tool rejects a slug, use the default and say so\. If it rejects the default, use the closest valid slug of the same family from its error message\. For a model race, name each arm's model up front\.#4. Pick exact discovered agent names. Inspect each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` for its model. A model race needs one loaded agent file and one exact override entry per arm; overrides cannot create agents.#
+# The Cursor wire fields, as tokens rather than as sentences. The sentence rules above carry the
+# meaning; this net is what keeps a Cursor field out of the tree when upstream rewords the
+# sentence those rules anchor on, which it does routinely. Each left side is a field name that
+# has no omp equivalent, so matching the token is always correct and never over-rewrites.
+s#`subagent_type: "([^"]+)"`#`agent`: `\1`#g
+s#`subagent_type`: `([^`]+)`#`agent`: `\1`#g
+s#`subagent_type`#`agent`#g
+s#subagent_type#agent#g
+s#`run_in_background: true`#one `task` call with all items in `tasks[]`#g
+s#`readonly: true`#read-only posture carried in the brief#g
+s#`readonly: false`#full tools per spawn#g
+s#agent mode \(`readonly: false`\)#full tools per spawn#g
+s#`readonly`: `true`#read-only posture carried in the brief#g
+s#`run_in_background: true`#one `task` call with all items in `tasks[]`#g
+s#readonly strips MCPs\.#nothing strips MCPs here.#g
+# A judge is spawned with read posture in its brief, never as a field. Matched on the field name
+# rather than the sentence, because upstream rewords the sentence and the field never survives it.
+s#Spawn one readonly judge subagent on that model\.#Start one judge in one `task` call with one item in `tasks[]`, the required shared `context`, and a brief that grants read tools only.#
+# `model`: the <role> line -> the agent that role names. Same reason: the field has no omp wire
+# equivalent, so replacing the token is always right and never over-rewrites.
+s#`model`: the `([^`]+)` line#`agent`: an exact discovered \1 agent#g
+s#`model` from the `([^`]+)` line#`agent` from the `task.agentModelOverrides` entry for an exact discovered \1 agent#g
+# A single spawn still uses the batch shape: one call, one item, one shared context.
+s#Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently#Assign one investigator to each category that has a matching MCP, in one `task` call with all items in `tasks[]` and the required shared `context` so they run concurrently#
+s#Spawn one synthesizer\.#Start one synthesizer in one `task` call with one item in `tasks[]` and the required shared `context`.#
+# Inline selectors that survive into patch context are exact values, not a Markdown catch-all.
+s#`subagent_type: "poteto-agent"`#`agent`: `poteto-agent`#g
+s#Shape: one or two questions with 4-6 options each, `allow_multiple: true` for category questions\.#Shape: one or two questions with 4-6 options each. Put `multi: true` on each category question object.#
+s#^1\. Spawn `Task` with `subagent_type: "Comment Sicko"`\.#1. Spawn one `task` call with one item in `tasks[]` and the required shared `context`. Use the exact discovered `comment-sicko` agent when present; otherwise omit `agent` for the default worker. Resolve the loaded `skill://no-comments` path to its plugin root and put the comment-reviewer role plus the absolute `<plugin-root>/agents/comment-sicko.md` file pointer in its brief.#
+# Plan lanes and the checker name an exact discovered worker agent, never a model-map role label.
+s#per the \*\*swarm\*\* skill, on the `swarm workers` model \(default `grok-[^`]+`\)#per the **swarm** skill, using exact discovered worker agents. Inspect each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` for its model#
+s#<swarm workers model>#<exact discovered worker agent name>#g
+s#with the model filled in#with the exact discovered agent name filled in#g
+# Cursor's per-item pseudo-spawns become real batches or one-item calls.
+s#^2\. \*\*Source wave\.\*\* One read-only subagent per feature file, launched concurrently\.#2. **Source wave.** Start one source-review batch in one `task` call with one item per feature file in `tasks[]`, the required shared `context`, and an exact discovered read-only reviewer agent for each item.#
+s#^Spawn one investigator per category that has a matching MCP\.#Assign one investigator to each category that has a matching MCP.#
+s#An event to watch \(CI, a merge, a ref advancing\) gets a watcher subagent that wakes you on the event,#For an event to watch (CI, a merge, a ref advancing), start one watcher in one `task` call with one item in `tasks[]`, the required shared `context`, and an exact discovered watcher agent; omit `agent` for the default worker with the watcher role when no specialist is discovered. It wakes you on the event,#
+s#^- \[ \] Spawn one owner per PR with the full lifecycle the execution playbook names\.#- [ ] Start all owners in one `task` call with all items in `tasks[]`, the required shared `context`, and one exact discovered owner agent per independent PR; omit `agent` for the default worker with the owner role when no specialist is discovered. Give each owner the full lifecycle the execution playbook names.#
+s#One subagent per PR, not batched, each a Cursor cloud agent, each exercising the real surface#Start all PR verifiers in one `task` call with all items in `tasks[]` and the required shared `context`; each item uses an exact discovered reviewer agent, or omits `agent` for the default worker with the reviewer role, and requests an isolated subagent. Each verifier exercises the real surface#
 
 ## 2. Model slugs. Tiered by capability first, then a catch-all for anything upstream adds later.
 
@@ -51,56 +146,22 @@ s#: grok-[0-9.]+-([a-z]+-)?fast(-[a-z]+)?$#: your fast code model#
 # `gpt-4` rename example is not a prescription and survives. omp-port reports what this rewrote.
 s#`(claude|gpt|grok|gemini|opus)-[a-z0-9.]+-[a-z0-9.-]+`#your configured model for this role#g
 
-## 3. The task wire. Cursor's Task parameters -> omp's task tool fields.
+## 3. Remaining exact task text and generated frontmatter.
 
-# `subagent_type: "X"` (Cursor's agent selector) -> omp's `agent` field.
-s#`subagent_type: "([^"]+)"`#`agent`: `\1`#g
-s#`subagent_type: generalPurpose`#`agent`: `task` (omp's general-purpose bundled agent)#g
-s#`subagent_type`: `generalPurpose`#`agent`: `task` (omp's general-purpose bundled agent)#g
-s#`subagent_type`#`agent`#g
-s#subagent_type#agent#g
-# `generalPurpose` (Cursor's built-in general agent) -> `task`, omp's bundled general agent.
-s#`generalPurpose`#`task` (omp's general-purpose bundled agent)#g
-s#generalPurpose#`task` (omp's general-purpose bundled agent)#g
-# Cursor's one-parameter background spawn -> omp batches every spawn in one tasks[] array.
-s#\*\*Defaults for every `Task` call\.\*\* `run_in_background: true`,#**Defaults for every `Task` call.** One `task` call with all items in `tasks[]`, batched in parallel,#
-s#`run_in_background: true`#one `task` call with all items in `tasks[]` (batched in parallel)#g
-# Cursor's readonly spawn mode -> posture in the brief, because omp's task wire has no such field.
-s#`readonly`: `true`#read-only posture. The brief grants only Glob, Grep, and Read, and forbids writes#g
-s#agent mode \(readonly strips MCP\)#full tools per spawn#g
-s#agent mode \(`readonly: false`\)#full tools per spawn#g
-s#`readonly`: `false` \(agent mode\)\. \*\*Do not use readonly/Ask mode\.\*\* It strips MCP access, which disables#Full tools per spawn. There is no `readonly` field and no Ask mode on omp's task wire, so nothing strips MCP access, which would otherwise disable#
-s#`readonly`: `false` \(agent mode\)\.#Full tools per spawn.#g
-s#Readonly strips MCPs\.#There is no such field on omp's task wire, so nothing strips MCPs.#g
-s#Readonly/Ask mode strips MCPs and defeats that\.#There is no such mode on omp's task wire, so nothing strips MCPs.#
-s#Spawn one readonly judge subagent on that model\.#Spawn one judge subagent whose brief grants read tools only.#
-s#readonly: true#read-only posture, granted in the brief#g
-# Cursor's ask tool -> `ask`, omp's tool name.
-s#`AskQuestion`#`ask`#g
-s#AskQuestion#`ask`#g
-s#`allow_multiple: true`#`allowMultiple: true`#g
-# Cursor's per-role model rule file -> the keyed override map in omp's config.
-s#`~/\.cursor/rules/pstack-models\.mdc`#`task.agentModelOverrides` in `~/.omp/agent/config.yml`#g
-s#~/\.cursor/rules/pstack-models\.mdc#`task.agentModelOverrides` in `~/.omp/agent/config.yml`#g
 # Cursor's Task-spawn slug enumeration and hypothetical models API -> `omp models`.
 s#Enumerate the model slugs you can pass to a `Task` subagent in this session\. That is the dependable source\. If Cursor also exposes a models API or CLI that lists the user's entitled models, prefer it for completeness\.#Run `omp models` to list the models configured on this machine. That is the dependable source.#
-# Cursor's blocking watch mode -> the same hazard, named with omp's blocking primitive too.
-s#Reaching for `drive` inside a phase agent stops that agent finishing its turn\.#Blocking on `drive`, or on `hub` `op: "wait"`, inside a phase agent stops that agent finishing its turn.#
-# Cursor's Task `model` argument -> omp has no per-call field, only the keyed override map.
-s#\(omit Task `model`\)#(leave it out of `task.agentModelOverrides`)#g
-s#If the configured value is `inherit-parent` or `auto`, omit `model` instead\.#If the configured value is `inherit-parent` or `auto`, leave that reviewer out of `task.agentModelOverrides` instead.#
-s#For a model race, name each arm's model up front\.#For a model race, give each arm its own agent file and its own `task.agentModelOverrides` entry.#
-# Cursor writes an always-applied rule file; omp writes two keys in its own config.
-s#Tell the user the rule was written and that it applies to new sessions\.#Tell the user which entries were written and that they apply to new sessions.#
-s#Per-role lines in the `/setup-pstack` rule override#Per-role entries written by `/setup-pstack` override#g
-/^alwaysApply: true$/d
+# Cursor's blocking watch mode has the same liveness hazard without naming another runtime primitive.
+s#Reaching for `drive` inside a phase agent stops that agent finishing its turn\.#Blocking inside a phase agent stops that agent finishing its turn.#
+# These exact Cursor tool tokens survive only in otherwise rewritten sentences.
+s#AskQuestion#ask#g
+s#Substituting `generalPurpose` skips that read and drifts\.#Substituting `task` (omp's general-purpose bundled agent) skips that read and drifts.#
 # Cursor agent frontmatter `is_background` -> omp does not model it.
 /^is_background: true$/d
 # omp gates nested spawning per agent definition, which Cursor has no counterpart for.
 /^name: poteto-agent$/a spawns: "*"
 # The router and its agent must name the omp levers file themselves, not only the pin reminder,
 # so an unpinned read of skill://poteto-mode or a spawned poteto-agent still finds it.
-s|^## Non-negotiables$|## Non-negotiables\n\n**Read `skill://omp-mechanics` right after this file.** It holds the omp-specific levers every step below assumes, and it is the port's only hand-written skill.|
+s|^## Non-negotiables$|## Non-negotiables\n\n**Read `skill://omp-mechanics` and `skill://pstack-omp` right after this file.** `pstack-omp` is the sole live task, vibe, eval, and runtime contract. `omp-mechanics` keeps only pstack-specific OMP deltas.|
 s#Reads the `poteto-mode` skill's `SKILL.md` in full before any work, including its inline Principles index\.#Reads the `poteto-mode` skill's `SKILL.md` in full before any work, including its inline Principles index, then `skill://omp-mechanics`.#
 # Cursor derives a mode skill's registry name from a display title; omp uses the slug.
 s#name: Poteto Mode#name: poteto-mode#
@@ -114,8 +175,8 @@ s#When a worker must start from a non-default pushed branch, pass `cloud_base_br
 s#One Cursor cloud agent#One isolated subagent (`isolated: true`)#g
 s#each a Cursor cloud agent#an isolated subagent (`isolated: true`)#g
 s#Cloud agents cannot read the local store, so their briefs inline what they need or point at repo paths\.#An isolated worker runs on this machine in its own worktree with no conversation history, so its brief inlines what it needs or points at absolute paths.#
-# Cursor's cloud dashboard -> `hub`, omp's live agent and job roster.
-s#the cloud agent's status in the Cursor dashboard#agent state from `hub` `op: "list"` and `hub` `op: "jobs"`#
+# Cursor's cloud dashboard -> the live omp agent roster read through history://.
+s#the cloud agent's status in the Cursor dashboard#agent state from `read history://` and `read proc://`#
 # Cursor's cloud PR tooling defaults to draft; omp's github tool defaults to ready.
 s#Cloud-agent PR tools default to draft, so set `draft: false` on every PR creation call\.#omp's `github` tool opens a ready PR from `op: "pr_create"` unless you pass `draft: true`, so leave that flag off.#
 s#Each live lane runs on its own cloud VM at the PR head\.#Each live lane runs in its own subagent at the PR head, asking for a private worktree with `isolated: true`.#
@@ -127,27 +188,44 @@ s#cloud-agent URL#prior agent's `history://<id>` or `agent://<id>`#g
 s#cloud spawns#isolated spawns#g
 s#its spawn budget with the cloud default and the local exception list#its spawn budget with the isolated default and the shared-checkout exception list#
 s#Restacks run in cloud\. A local restack at this scale takes the laptop down\.#Restacks run in an isolated subagent with its own worktree, never in the parent checkout.#
-s#After a Cursor restart: local agents are dead, cloud work is not\.#An omp restart stops every agent. Resuming the session rebuilds its subagents as parked rows that `hub` `op: "send"` revives, except isolated ones, which leave only a `history://<id>` transcript.#
+s#After a Cursor restart: local agents are dead, cloud work is not\.#An omp restart stops every agent. Resuming the session rebuilds its subagents as parked rows that `write agent://<id>` revives, except isolated ones, which leave only a `history://<id>` transcript.#
 s#reattach cloud work by PR and branch rather than agent id#reattach pushed work by PR and branch rather than agent id#
 s#a Cursor restart#an omp restart#g
 s#cloud agent#isolated subagent#g
 s#Cloud agent#Isolated subagent#g
 
-## 5. Wake mechanisms. Cursor's `/loop` builtin and cloud sleeper -> omp's `/loop`, hub, systemd.
+## 5. Wake mechanisms. Cursor's `/loop` builtin and cloud sleeper -> omp's `/loop`, named bash processes, and systemd.
 
 s#Drive a long or stubborn hunt with Cursor's `/loop` command\.#Drive a long or stubborn hunt with omp's `/loop`, which re-submits the same prompt after every yield. State the exit condition as a shell command and pass it as `--until '<cmd>'`, which gates each iteration on that command's exit status.#
-s#Pick the wake mechanism using Cursor's `/loop` command \(a built-in, not a pstack skill\)\.#Pick the wake mechanism. In session, omp's `/loop [count|duration] [--while|--until '<cmd>'] [prompt]` re-submits the prompt after every yield and gates each iteration on a shell command's exit status. A wake that must land out of session runs under a `hub` supervised watcher or a systemd user timer.#
+s#Pick the wake mechanism using Cursor's `/loop` command \(a built-in, not a pstack skill\)\.#Pick the wake mechanism. In session, omp's `/loop [count|duration] [--while|--until '<cmd>'] [prompt]` re-submits the same prompt after every yield and gates each iteration on a shell command's exit status. A wake that must land out of session runs as a named bash process observed through `proc://`, or under a systemd user timer.#
 s#A local root arms each tick as a real terminal `/loop`\. The loop uses a monitored-shell 30-minute sleep and emits an output-notification sentinel\.#A root in session arms each tick with omp's `/loop`, which re-submits the tick prompt after every yield.#
-s#A cloud root uses the existing cloud-sleeper wake chain instead\.#A wake that has to land out of session runs under a `hub` supervised watcher or a systemd user timer instead.#
-s#In a local session, a real terminal `/loop`\. In a cloud root, a cloud-sleeper wake chain\.#In session, omp's `/loop`. For a wake that must land out of session, a `hub` supervised watcher or a systemd user timer.#
-s#Run `drive` and `background` under `/loop` in dynamic mode\.#Run `drive` and `background` under omp's `/loop` while `loop.mode` is `prompt`, or under a `hub` supervised watcher when the wake must land out of session.#
-s#Hold the watch under `/loop` in dynamic mode\.#Hold the watch under omp's `/loop` while `loop.mode` is `prompt`, or under a `hub` supervised watcher when the wake must land out of session.#
-s#`/loop` per component until the diff is zero\.#Hold a `hub` watcher or a systemd timer per component until the diff is zero.#
-s#a frontier watcher wake \(arm it via the loop skill, with a long heartbeat fallback\)#a frontier watcher wake (hold it under a `hub` watcher or a systemd timer, with a long fallback heartbeat)#
+s#A cloud root uses the existing cloud-sleeper wake chain instead\.#A wake that has to land out of session runs as a named bash process observed through `proc://`, or under a systemd user timer instead.#
+s#In a local session, a real terminal `/loop`\. In a cloud root, a cloud-sleeper wake chain\.#In session, omp's `/loop`. For a wake that must land out of session, use a named bash process observed through `proc://`, or a systemd user timer.#
+# Cursor's Babysit mode vocabulary. `drive`, `background`, `threads-only`, and `check` are Cursor
+# commands with no omp counterpart: omp's CLI has neither `drive` nor `background`, and the port's
+# own watcher declares WatchMode "single" | "stack" | "queued-stack" with no mode argument at all.
+# These sentences used to name all four, so an agent following this playbook was told to run
+# something that does not exist. Each now names an invocation of scripts/watch-pr/watch-pr, which
+# is what the playbook already points at for the verdict.
+s#Run `drive` and `background` under `/loop` in dynamic mode\.#Run the merge-ready loop, or the non-blocking triage, under omp's `/loop` while `loop.mode` is `prompt`, or under a named bash process observed through `proc://` when the wake must land out of session.#
+s#\*\*Declare the mode and resolve the forge before any poll\.\*\*#**Name the watcher invocation and resolve the forge before any poll.**#
+s#`drive` runs the loop to merge-ready, for "babysit this", "get it green", "merge-ready"\.#`drive`, `background`, `threads-only`, and `check` name no command on this runtime: omp's CLI has neither `drive` nor `background`, and the port's own watcher declares WatchMode "single" | "stack" | "queued-stack" and takes no mode argument at all. They are four ways to invoke `scripts/watch-pr/watch-pr`, which is what this playbook already points at for the verdict. To run the loop to merge-ready, for "babysit this", "get it green", "merge-ready", invoke the watcher bare and let it poll to a terminal verdict.#
+s#`background` triages without blocking, which is the mode for a plan still executing\.#To triage without blocking, which is what a plan still executing wants, invoke that same watcher as one supervised `bash` call carrying a unique `name` and a `ready` condition, then read it at `proc://<name>`; a `name` selects service mode and cannot be combined with `async: true`, which is the separate finite-command path that hands back a job id. Either way this is a scheduling choice, not a mode the watcher knows.#
+s#`threads-only` answers review comments and touches nothing else, for "address the bugbot comments"\.#To answer review comments and touch nothing else, for "address the bugbot comments", stop on the watcher's `BLOCKER` verdict with reason `review-threads` and work only those threads.#
+s#`check` is one status pass and a report, for "check on X" and "is it green"\.#For one status pass and a report, for "check on X" and "is it green", pass `--status-only`.#
+s#Undeclared defaults to `drive`\.#Undeclared defaults to the bare watcher.#
+s#Small or docs-only PRs get `check`, not `drive`\.#Small or docs-only PRs get `--status-only`, not the bare command.#
+s#In `check` mode pass `--status-only`\.#For a single status pass, pass `--status-only`.#
+s#The bare command polls until a terminal verdict, which is `drive` behavior\.#The bare command polls until a terminal verdict, which is the merge-ready loop.#
+s#On Origin, stop `drive` when the frontier is merge-ready:#On Origin, stop the polling loop when the frontier is merge-ready:#
+s#\*\*Reply:\*\* the mode, the frontier and its active-forge state#**Reply:** the watcher invocation, the frontier and its active-forge state#
+s#Hold the watch under `/loop` in dynamic mode\.#Hold the watch under omp's `/loop` while `loop.mode` is `prompt`, or under a named bash process observed through `proc://` when the wake must land out of session.#
+s#`/loop` per component until the diff is zero\.#Hold a named bash process observed through `proc://`, or a systemd timer, per component until the diff is zero.#
+s#a frontier watcher wake \(arm it via the loop skill, with a long heartbeat fallback\)#a frontier watcher wake (hold a named bash process observed through `proc://`, or a systemd timer, with a long fallback heartbeat)#
 s#"/loop until X"#"run until X"#g
-# Cursor's `/goal` is on by default; omp ships it behind a settings gate.
-s#arm a `/goal` with the full program objective\.#arm a `/goal` with the full program objective. omp's `/goal` is native but gated, so turn on `goal.enabled` in settings first. Since 18.0.2 the tool registers lazily, so turning it on mid-session also works.#g
-s#arm a `/goal` with this exact text\.#arm a `/goal` with this exact text. omp's `/goal` is native but gated, so turn on `goal.enabled` in settings first. Since 18.0.2 the tool registers lazily, so turning it on mid-session also works.#
+# Cursor's default goal arming needs an omp-specific fallback that preserves the predicate.
+s#arm a `/goal` with the full program objective\.#arm a `/goal` with the full program objective. Use `/goal` only if exposed and enabled; otherwise retain the predicate in the durable plan. Do not change global configuration.#g
+s#arm a `/goal` with this exact text\.#arm a `/goal` with this exact text. Use `/goal` only if exposed and enabled; otherwise retain the predicate in the durable plan. Do not change global configuration.#
 
 ## 6. cursor-team-kit. Cursor's companion plugin -> omp's built-in tools.
 
@@ -155,17 +233,17 @@ s#arm a `/goal` with this exact text\.#arm a `/goal` with this exact text. omp's
 s#the `deslop` skill from the `cursor-team-kit` plugin \(`/deslop`\)#the `unslop` skill (`skill://unslop`) plus `omp cleanse --all` for diagnostics#g
 s#Run `/deslop` from `cursor-team-kit` over the diff before commit\.#Run the `unslop` skill (`skill://unslop`) plus `omp cleanse --all` over the diff before commit. A bare `omp cleanse` opens an interactive picker and blocks.#
 s#`/deslop`#the `unslop` skill (`skill://unslop`) plus `omp cleanse --all`#g
-# `control-ui` / `control-cli` -> `browser`, `computer`, and `hub` process ops plus bash.
-s#`control-ui` or `control-cli` runtime verification \(from `cursor-team-kit`\)#`browser` or `computer` for UIs, or `hub` process ops plus bash for CLIs and TUIs#
-s#\(`control-cli` or `control-ui` from `cursor-team-kit` as the change demands\)#(`browser` or `computer` for UIs, `hub` process ops plus bash for CLIs and TUIs, as the change demands)#
-s#\(`control-ui` or `control-cli` from `cursor-team-kit` as the change demands\)#(`browser` or `computer` for UIs, `hub` process ops plus bash for CLIs and TUIs, as the change demands)#
-s#Drive through `control-ui` or `control-cli` from `cursor-team-kit`\.#Drive through `browser` or `computer` for UIs, and `hub` process ops plus bash for CLIs and TUIs.#
-s#Browser, Electron, and web UIs use `control-ui` from `cursor-team-kit`\. CLIs and TUIs use `control-cli` from `cursor-team-kit`\.#Browser, Electron, and web UIs use the `browser` eval prelude, and native desktop UIs use `computer`. Both are code in an `eval` cell and not tools. CLIs and TUIs use `hub` process ops plus bash.#
-s#`cursor-team-kit` publishes `control-cli` \(CLIs and TUIs\) and `control-ui` \(browser / Electron / web UIs\)\.#omp provides the levers directly. `hub` process ops plus bash drive CLIs and TUIs, the `browser` eval prelude drives browser, Electron, and web UIs over CDP, and the `computer` prelude drives native desktop. Both preludes are code in an `eval` cell and neither is a tool with its own schema.#
+# `control-ui` / `control-cli` -> browser, computer, and named bash processes.
+s#`control-ui` or `control-cli` runtime verification \(from `cursor-team-kit`\)#`browser` or `computer` for UIs, or bash with a unique `name`, a `ready` check, and `proc://` state for CLIs and TUIs#
+s#\(`control-cli` or `control-ui` from `cursor-team-kit` as the change demands\)#(`browser` or `computer` for UIs, bash with a unique `name`, a `ready` check, and `proc://` state for CLIs and TUIs, as the change demands)#
+s#\(`control-ui` or `control-cli` from `cursor-team-kit` as the change demands\)#(`browser` or `computer` for UIs, bash with a unique `name`, a `ready` check, and `proc://` state for CLIs and TUIs, as the change demands)#
+s#Drive through `control-ui` or `control-cli` from `cursor-team-kit`\.#Drive through `browser` or `computer` for UIs, and bash with a unique `name`, a `ready` check, and `proc://` state for CLIs and TUIs.#
+s#Browser, Electron, and web UIs use `control-ui` from `cursor-team-kit`\. CLIs and TUIs use `control-cli` from `cursor-team-kit`\.#Browser, Electron, and web UIs use the `browser` eval prelude, and native desktop UIs use `computer`. Both are code in an `eval` cell and not tools. CLIs and TUIs use bash with a unique `name`, a `ready` check, and `proc://` state.#
+s#`cursor-team-kit` publishes `control-cli` \(CLIs and TUIs\) and `control-ui` \(browser / Electron / web UIs\)\.#omp provides the levers directly. Bash with a unique `name`, `ready` checks, and `proc://` state drives CLIs and TUIs, the `browser` eval prelude drives browser, Electron, and web UIs over CDP, and the `computer` prelude drives native desktop. Both preludes are code in an `eval` cell and neither is a tool with its own schema.#
 s#\*\*Control skill\.\*\* Pick it by surface\.#**Control surface.** Pick it by surface.#
 s#through the control skill's commands#through the control surface's own calls#
 s#`control-ui`#the `browser` eval prelude#g
-s#`control-cli`#`hub` process ops plus bash#g
+s#`control-cli`#bash with a unique `name`, a `ready` check, and `proc://` state#g
 s#`cursor-team-kit`#omp's built-in tools#g
 s#cursor-team-kit#omp's built-in tools#g
 
@@ -174,6 +252,7 @@ s#cursor-team-kit#omp's built-in tools#g
 # The playbook cannot route to itself, so its step 1 states the omp authoring path directly.
 s#^1\. Use the \*\*create-skill\*\* skill \(Cursor's built-in for authoring SKILL\.md files\)\.$#1. Write the SKILL.md yourself with `write` or `edit`. omp's `manage_skill` writes only under `~/.omp/agent/managed-skills` and never touches a user-authored skill. Give it YAML frontmatter with `name` matching its directory, a `description` naming what the skill does and when to reach for it, and `disable-model-invocation: true` so it stays out of the per-turn index.#
 s#the \*\*create-skill\*\* skill \(Cursor's built-in for authoring SKILL\.md files\)#the **authoring-a-skill** playbook (`playbooks/authoring-a-skill.md`)#g
+s#\*\*authoring-a-skill\*\* playbook \(`playbooks/authoring-a-skill\.md`\)#**authoring-a-skill** playbook (`skill://poteto-mode/playbooks/authoring-a-skill.md`)#
 s#A `create-skill`-style#An `authoring-a-skill`-style#g
 s#Cursor's built-in `create-skill` skill#the `authoring-a-skill` playbook#g
 s#Cursor's built-in `create-skill`#the `authoring-a-skill` playbook#g
@@ -203,16 +282,56 @@ s#, or plugin-installed paths under `~/\.cursor/plugins/`#, or plugin-installed 
 # Cursor's worktree path convention -> whatever path the local tool manages.
 s#misses one that lives at `\.cursor/worktrees/myrepo/x`#misses one that lives at a tool-managed path like `.worktrees/myrepo/x`#
 # Cursor's pinned-chat sidebar -> omp's live roster plus the session store.
-s#The pinned and active chats are the real artifact \(principle-prove-it-works\)\. Get that set from the user or sidebar and cross-check every candidate\. The lever has marked `safe` a worktree the user had pinned, so the pinned set wins\.#The live omp sessions are the real artifact (principle-prove-it-works). Get that set from `hub` `op: "list"` plus the session store at `~/.omp/agent/sessions/<encoded-cwd>/`, confirm it with the user, and cross-check every candidate. The lever has marked `safe` a worktree a live session still owned, so the live set wins.#
+s#The pinned and active chats are the real artifact \(principle-prove-it-works\)\. Get that set from the user or sidebar and cross-check every candidate\. The lever has marked `safe` a worktree the user had pinned, so the pinned set wins\.#The live omp sessions are the real artifact (principle-prove-it-works). Get that set from `read history://` plus the session store at `~/.omp/agent/sessions/<encoded-cwd>/`, confirm it with the user, and cross-check every candidate. The lever has marked `safe` a worktree a live session still owned, so the live set wins.#
 s#report whether the chat is pinned or ongoing and which worktrees it touches#report whether the session is still live and which worktrees it touches#
-s#A pinned chat spawns arena and repro trees into sibling worktrees via background subagents, and those are in use even when their names never hit the sidebar\.#A live session spawns arena and repro trees into sibling worktrees via background subagents, and those are in use even when `hub` `op: "list"` never names them.#
+s#A pinned chat spawns arena and repro trees into sibling worktrees via background subagents, and those are in use even when their names never hit the sidebar\.#A live session spawns arena and repro trees into sibling worktrees via background subagents, and those are in use even when `read history://` never names them.#
 # Cursor exposes enabled MCP servers as a directory; omp lists them in one config file.
 s#Before spawning investigators, list the available MCPs from the Cursor environment\. Use the available-tools map when present\. Otherwise inspect the `mcps/` directory Cursor exposes for enabled MCP servers\.#Before spawning investigators, list the available MCPs from the session environment. Use the available-tools map when present. Otherwise read `~/.omp/agent/mcp.json` for enabled MCP servers.#
 # Cursor resumes an idle agent to reach it; omp messages it and leaves it running.
-s#Agents are spawned, resumed, and drained only through the Task tool\.#Agents are spawned and drained only through the Task tool, and resumed only through `hub` messaging.#
+s#Agents are spawned, resumed, and drained only through the Task tool\.#Agents are spawned and drained only through the Task tool, and resumed only through `write agent://<id>` messaging.#
 # Bugbot is a Cursor product, so the rubric names what plays its part on omp.
 s#^Use this reference when the Babysit playbook \(`\.\./playbooks/babysit\.md`\) handles Bugbot or review-automation comments\.#Use this reference when the Babysit playbook (`../playbooks/babysit.md`) handles Bugbot or review-automation comments. Bugbot is Cursor's hosted review product, so without it this rubric applies to whatever review bot posts on your PRs, including omp's own `security-reviewer`.#
-# Net for any Cursor home path a later upstream commit introduces.
+s#`,? in place of the `(arena|architect|swarm|interrogate) reviewers?` line##g
+s#the `arena cross-judge pool` line in the `pstack-models\.mdc` rule#an exact discovered judge agent whose configured model differs from the parent's when the roster provides one#g
+# Upstream's effort-matching step names the role's own line, which is a Cursor key on omp. The
+# capability it stands for is the budget the setup skill writes, so point there instead.
+s#the role.s line or default#the role's entry in `~/.omp/agent/config.yml`, or its default#g
+s#the `swarm workers` model and speed \(your fast code model by default\)#the swarm role's own entry and speed#g
+s#the `(architect|arena|swarm|interrogate) runners` line in the `pstack-models\.mdc` rule#the exact discovered runner agents#g
+s#the `interrogate reviewers` line in the `pstack-models\.mdc` rule#one exact discovered reviewer agent per configured entry#g
+s#the `arena cross-judge pool` line in `~?/?\.cursor/rules/pstack-models\.mdc`#an exact discovered judge agent whose configured model differs from the parent's when the roster provides one, in `~/.omp/agent/config.yml`#g
+s#the `(architect|arena|swarm|interrogate) runners` line in `~?/?\.cursor/rules/pstack-models\.mdc`#the exact discovered runner agents in `~/.omp/agent/config.yml`#g
+s#the `interrogate reviewers` line in `task\.agentModelOverrides` in `~/\.omp/agent/config\.yml`#one exact discovered reviewer agent per entry in `~/.omp/agent/config.yml`#g
+# The last two Cursor role labels. Same reasoning as the runner lines above: the label is a key
+# in a rule file that omp does not have, so naming it names nothing. The capability it stood for
+# is what the port writes instead.
+s#the `how (explorer|explainer)` line#an exact discovered \1 agent in `~/.omp/agent/config.yml`#g
+s#one per entry on the `interrogate reviewers` line in `~?/?(\.cursor/rules/pstack-models\.mdc|task\.agentModelOverrides in ~?/?\.omp/agent/config\.yml)`#one per configured entry in `~/.omp/agent/config.yml`#g
+s#Set `model` to that line.s value, or to the default if the rule or the line is missing\.#Each discovered agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects its model; the item has no `model` field.#g
+s#Leave `model` unset when the value is `auto` or `inherit-parent`\.#An `auto` or `inherit-parent` entry means the parent chat model, so omit that role from the map.#g
+s#the `interrogate reviewers` line in `task\.agentModelOverrides` in `~?/?\.omp/agent/config\.yml`#one exact discovered reviewer agent per configured entry in `~/.omp/agent/config.yml`#g
+s#the `architect runners` line in the `task\.agentModelOverrides` entries in `~/\.omp/agent/config\.yml`#the same exact discovered runner agents Arena uses, with the architect role in each brief, in `~/.omp/agent/config.yml`#g
+s#an exact discovered (why investigators|why synthesizer|interrogate reviewers|swarm workers|architect runners|arena runners|arena cross-judge pool|reflect tooling|reflect judgment, divergent, synthesizer) agent#an exact discovered agent filling that role#g
+s#one per entry on one exact discovered reviewer agent per entry#one per configured entry#g
+# A single spawn is still one task call with one item and the required shared context. Matched on
+# the "spawn one <role>" phrase, which is the shape upstream uses everywhere it means one worker,
+# rather than on the sentence around it.
+s#([Ss]pawn) one ([a-z]+)#\1 one \2 in one `task` call with one item in `tasks[]` and the required shared `context`#g
+s#, in place of the .(arena|architect|swarm|interrogate) runners. line#.#g
+s#`agent`: an exact discovered (how explorer|how explainer) (agent|line)#`agent`: an exact discovered agent filling that role#g
+
+# Net for any Cursor home path a later upstream commit introduces. The model-rule file is named
+# before the general net because omp has no rules directory: a specific rule that missed on a
+# reworded sentence used to leave this for the net to turn into a path that resolves to nothing.
+# The role label is Cursor's key name and dies with Cursor's rule file. omp keys the map by exact
+# agent name, so "the `arena runners` line" names a key that does not exist, and calling it an
+# agent is just as wrong. Point at the capability instead: resolve exact discovered runner agents
+# and let each one's frontmatter or task.agentModelOverrides entry pick its model. This runs
+# before the path rules below so it still sees the upstream path.
+s#`~?/?\.cursor/rules/pstack-models\.mdc`#`task.agentModelOverrides` in `~/.omp/agent/config.yml`#g
+# The same file named without a path, which upstream does in the sentences above. Pointing it at
+# the config is correct whether or not a path was written, so this matches the bare name too.
+s#the `pstack-models\.mdc` rule#the `task.agentModelOverrides` entries in `~/.omp/agent/config.yml`#g
 s#~/\.cursor/#~/.omp/#g
 
 ## 9. Install paths. pstack is vendored in Cursor's monorepo and installed as a plugin on omp.
@@ -231,3 +350,156 @@ s#([^/])pstack/skills/#\1~/.omp/plugins/node_modules/pstack/skills/#g
 s#@cursor-skill/#@omp-skill/#g
 # Cursor auto-attaches a skill on a file-glob match; omp carries `globs` as metadata only.
 s#^paths: \[#globs: [#
+# Subagent prompt templates are the one place a wrong tool name is fatal rather than cosmetic:
+# the lens greps the transcript for the tools that were called and finds none, so it returns
+# nothing. Each pattern carries enough surrounding context to match the instruction and not the
+# English verb of the same word.
+s#- `Read` tool calls against any#- `read` calls against any#
+s#- `Task` prompts that name a skill path#- `task` calls whose brief names a skill path#
+s#Tool calls \(Shell, Grep, MCP, etc\.\)#Tool calls (`bash`, `grep`, MCP, etc.)#
+s#Reviewers return findings in the `Task` response body\.#Reviewers return findings in the spawn result's structured `data`, or in the delivered report when no schema was requested.#
+s#Use Glob to find directories and files, Grep to find key symbols, Read to understand#Use `glob` to find directories and files, `grep` to find key symbols, `read` to understand#
+s#Use Read, Grep, and Glob as needed\.#Use `read`, `grep`, and `glob` as needed.#
+s#Subagents inherit it\. Multiple `Task` calls on the same branch each get their own worktree#A worker shares the parent's checkout unless its spawn sets `isolated: true` where the live schema exposes it, so give every concurrent writer its own worktree explicitly#
+# omp registers one slash command per skill as /skill:<name>; a bare /how is not a command on this
+# harness. `/poteto-mode` is in the alternation only because the gate scans for it like any other
+# name; the port's own extension registers that command, so the rewrite is a no-op in practice.
+#
+# One rule covers every name rather than one rule per skill. The per-skill form was a list that
+# forgot: upstream added eighteen skills after it was written and every one of them shipped a bare
+# /name the gate could not accept. Adding a skill upstream now means adding its name to the
+# alternation, once.
+s#`/(teach|recall|reflect|tdd|swarm|arena|interrogate|correct|setup-pstack|automate-me|figure-it-out|show-me-your-work|benchmark-checklist|blast-radius|ketchup|bro|make-bot-ui|poteto-help|no-comments|unslop|create-verification-skill|maintain-verification-skill|architect|why|how|technical-writing|sharpen|in-your-own-words|typescript-best-practices|poteto-mode|principle-[a-z-]+)`#`/skill:\1`#g
+# One verdict vocabulary. pstack-omp and swarm both name PASS/ISSUES/BLOCKED; shipping named a
+# different three, and its landing rule tested for a different set, so a verifier told by one file
+# and checked by another could not satisfy both.
+s#Each returns `PASS`, `PASS\+NOTES` or `FAIL` and posts that verdict on its own PR\.#Each returns `PASS`, `ISSUES` or `BLOCKED`, the three verdicts `skill://pstack-omp` and **swarm** use, and posts that verdict on its own PR. Notes ride on a `PASS` rather than forming a fourth verdict, so a passing run with observations is still a pass.#
+s#stop at the first one without a passing verdict, where both `PASS` and `PASS\+NOTES` pass\.#stop at the first one whose verdict is not `PASS`.#
+
+## 10. Irreversible actions, and what the runtime actually enforces. Every replacement below
+## exists because the original either contradicted another sentence in the same tree, named a
+## surface omp does not have, or told an agent to do something the harness cannot stop. The
+## machine half is plugins/pstack/extensions/pstackpolicy, which refuses the forge mutations
+## unless the operator set PSTACK_LANDING_GRANT; prose alone cannot, because yolo auto-approves
+## the exec tier and every pstack owner is a headless subagent.
+
+# Landing is the one action the port routes a human toward and then never gated. The --auto branch
+# of this same step already carries "and the user asked"; the immediate branch did not, so an agent
+# reading step 5 alone had licence to merge under yolo with nothing to stop it.
+s#If the bottom PR is mergeable now, squash it with#Merge only on an explicit request. If the bottom PR is mergeable now and the user asked to land, ship, or merge it, squash it with#
+
+# The pause list is the port's only global gate and it omitted every forge action its own
+# autopilots perform, so those actions fell through it entirely.
+s#^\*\*Always pause\*\* for irreversible writes: force-push to shared branches, deploys, data deletion, customer messages\.$#**Always pause** for irreversible writes: pushing to trunk, merging a pull request, retargeting a pull request base, force-pushing a shared or trunk branch, closing a pull request, an issue, or a review thread, posting a review or review comment, resolving a review thread, deleting a branch on the forge, deploys, data deletion, customer messages.#
+
+# Two lines below an unqualified "keep going" reads as "do not pause". It is not; it is the
+# autonomy switch for reversible work.
+s#^\*\*Session overrides:\*\* "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going\.$#**Session overrides:** "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going on reversible work. They never waive the pause list above; a request to be autonomous is not authorisation to land.#
+
+# Granted an ungated push to trunk by the Roles section while the escalation list two pages later
+# omitted landing, so by the playbook's own rule the push never surfaced.
+s#Mechanically landing a verified unit \(fast-forward or clean cherry-pick of a worker's commit, then push\) is bookkeeping the coordinator may do itself on repos where local git is cheap\.#Mechanically landing a verified unit (fast-forward or clean cherry-pick of a worker's commit, then push to that unit's own branch) is bookkeeping the coordinator may do itself on repos where local git is cheap. Merging, or pushing to trunk, needs an operator landing grant recorded in the standing orders, exactly like any other irreversible write.#
+
+s#irreversible actions \(force-push to shared branches, deploys, deletions, closing someone else's PR\)#irreversible actions (pushing to trunk, merging, force-pushing a shared branch, retargeting a base, closing someone else's PR, issue, or review thread, posting a review, deploys, deletions)#
+
+# Seven columns, because that is what the runtime enforces. The thirteen below were prose the
+# store never wrote, so every `orch` command after following it failed on the header line.
+s#`units.tsv` has one row per unit: id, track, state, branch, PR, head SHA, brief path\.#`units.tsv` has one row per unit and exactly seven tab-separated columns, which is what `orch` enforces on the header and on every row: id, track, state, branch, pr, sha, brief. A ninth column is rejected, so do not add one.#
+
+# Mandatory, and the playbook never said so, so the first runtime step of any program aborted.
+s#2\. \*\*Install the runtime\.\*\* Run `orch init`\.#2. **Install the runtime.** Run `orch init --store <repo-dir>`; `--store`, or `ORCH_STORE`, is required and the command aborts without it.#
+
+# Routing through one writer is a constraint on who writes, not authorisation that they may.
+s#PR closes and retargets go through the stacker only\.#PR closes and retargets go through the stacker only, and only once the operator has approved that specific change; one writer is not consent.#
+
+# Leftover mode vocabulary. The four Cursor modes are gone, so naming one here contradicts the
+# playbook this index points at.
+s#\*\*You own the merge frontier\. Declare a mode, clear one PR at a time, stop where the human's call begins\.\*\*#**You own the merge frontier. Name the watcher invocation, clear one PR at a time, stop where the human's call begins.**#
+s#Declare its mode before polling\.#Name its watcher invocation before polling.#
+
+## 11. Residual accuracy fixes. Each of these is a sentence that was wrong, incomplete, or
+## contradicted another sentence in the same tree. None is a Cursor residue; they are the port's
+## own claims about itself, which is the class nothing upstream can fix for us.
+
+# autopilot-stack grants --force-with-lease and base retarget but omits the one line its sibling
+# carries verbatim, so an agent reading only this playbook has licence to rewrite any branch in the
+# chain, including one a human pushed to.
+s#push with `--force-with-lease` only after an `ls-remote` check, and set the PR base to the parent branch\.#push with `--force-with-lease` only after an `ls-remote` check, and set the PR base to the parent branch. Never force-push a shared branch.#
+
+# shipping step 4 retargets a base with no consent clause, and step 7 re-runs steps 3-6 for every PR
+# in the stack, so an unguarded retarget here reaches the whole chain.
+s#4\. \*\*Prepare only the bottom PR\.\*\* Fetch current trunk\.#4. **Prepare only the bottom PR**, and retarget only on the operator's explicit go: an operator approval to land a PR is not approval to rewrite the base of every PR above it. Fetch current trunk.#
+
+# The autonomy sentence contradicted the pause-list scope added in section 10, and the index routes
+# "full autopilot" straight here, so the trigger phrase the operator types is the phrase that clause
+# disqualified.
+s#The operator's full-autonomy grant plus the root's clean verdict is the merge authorization that babysitting alone never has\.#A full-autonomy grant authorises the owner to keep working without checking in; the root's clean verdict authorises a merge only inside that grant. Neither is implied by "go faster", and both still require the operator to have armed PSTACK_LANDING_GRANT for the merge itself.#
+
+# `trash` is macOS, so the step could not be followed on this host, and the sentence forbade the one
+# fallback that would work. Handled in zz-live-runtime-routing.patch instead, because that line is
+# the patch's own output and a sed rule cannot see it.
+
+# The `or` put a hard reset on the same footing as a worktree, and the very next clause handled a
+# dirty branch safely. So the file knew the hazard and still offered the destructive branch first,
+# with no check between the two.
+s#or `git fetch && git reset --hard origin/<branch>` between them\.#or `git fetch && git reset --hard origin/<branch>` between them -- and only after `git status --porcelain` comes back empty, since the next clause is what you do when it does not.#
+
+## 12. Graphite. Four playbooks said "Never require Graphite (`gt`)" while orchestrate made `gt`
+## the authoritative stack oracle and the store hard-errors without it. Only one of those can be
+## true, and the code is the one that decides what an agent experiences: `orch frontier` resolves
+## the stack through Graphite when it is installed and refuses to guess when it is not, and nothing
+## else in the port touches it. So `gt` is optional and never authoritative. These sentences now
+## say that, and no longer imply the port breaks without Graphite.
+
+s#Recompute `frontier.json` from `gt` after every merge and stack mutation because GitHub base refs drift mid-restack while gt tracking is authoritative: ordered PR list, branch names, head SHAs, a generation number, the lowest unmerged PR\.#Recompute `frontier.json` after every merge and stack mutation, because base refs drift mid-restack. `orch frontier` resolves the order from the forge's own PR base refs when it can, and refuses to guess rather than inventing an order when it cannot; record what it could not resolve instead. A pull request that is not reachable from trunk is reported as unattached rather than assumed to be in the stack.#
+
+
+s#- Workers never rebase and never run `gt`\.#- Workers never rebase and never touch stack topology.#
+
+
+## 12. Findings from a 71-agent per-file audit. Each rule here is a sentence that survived the
+## rewrite and is wrong on omp. They cluster into two classes worth remembering: a document
+## rewritten on one side of a page and not the other, and a paraphrase of a harness rule that
+## dropped half of it. Both are invisible to a diff that only looks for Cursor vocabulary.
+
+# Bare `/<name>` is not an omp command. Skills register as `/skill:<name>`; unhandled slash input
+# falls through as literal prompt text, and with `disable-model-invocation: true` the skill is
+# hidden from the index, so the model cannot recover it either. Two skills in this port already
+# use the right form and the gate only greps the backticked one, which is why these survived.
+s#Use for /arena,#Use for /skill:arena,#
+s#Use for /swarm,#Use for /skill:swarm,#
+s#Use for /architect,#Use for /skill:architect,#
+s#Use for /figure-it-out,#Use for /skill:figure-it-out,#
+s#Use for /show-me-your-work,#Use for /skill:show-me-your-work,#
+s#"/architect with checkpoint,"#"/skill:architect with checkpoint,"#
+
+# `cursor location` is a Cursor composer affordance: the editor injects the caret position. omp is
+# a terminal harness with no editor-state primitive, so an agent following the hint looks for a
+# signal that does not exist.
+s#(open files, recent edits, cursor location, what was just discussed)#(open files, recent edits, what was just discussed)#
+
+# False: a subagent's `tools:` list does not remove MCP tools or server instructions
+# (omp://system-prompt-customization.md). The real restriction on `scout` is the tool set, not MCP.
+s#The strict `scout` definition has no MCP grant, so never assign MCP work to it\.#The strict `scout` definition has no write tools, so keep it off any lane that must edit. Its MCP tools are inherited: a task agent's `tools:` list does not remove them.#
+s#an exact discovered full-access worker for citation spot-checks that call MCP\. The strict `scout` definition cannot serve that lane\.#an exact discovered full-access worker for citation spot-checks that call MCP. `scout` inherits MCP tools and can serve that lane, but it cannot write.#
+
+# `spawn on a fast, cheap model` asks for a per-spawn knob the task tool does not have. Every
+# sibling fan-out skill states the real mechanism; this one kept the Cursor-era phrasing.
+
+# `subagents/` is a Cursor transcript layout level. On omp the third level is
+# `<session-stem>/<AgentId>/<AgentId>.<Step>.jsonl`, and the prescribed glob matched 0 files against
+# 181 that exist. The prose one line below was corrected; the command was not.
+s#/\*/subagents/\*\.jsonl#/*/*/*.jsonl#
+
+# No omp system prompt names the session transcript tree; `history://<id>` is the documented
+# surface. The path is correct, the justification for trusting it was not.
+s#(the system prompt names the path)#(`history://<id>` is the documented surface)#
+
+# omp discovers skills one level under the root; the nested shape this prescribes is explicitly
+# not discovered, so the skill it produces silently never registers.
+
+# The `how` skill has no modes. It branches on Step 2a Explore / Step 2b Direct Explain.
+
+# Unqualified force-push blocks the port's own rebase flow, which `pstackpolicy` explicitly permits
+# and `autopilot-stack` prescribes. Scope the pause the way the rest of the port scopes it.
+s#(force-push, delete production data, send external messages)#(force-push to a shared or trunk branch, delete production data, send external messages)#

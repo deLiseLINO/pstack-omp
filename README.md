@@ -3,7 +3,7 @@
 An omp marketplace carrying two plugins.
 
 `pstack` is Lauren Tan's engineering methodology for Cursor, ported to oh-my-pi and made
-model and provider agnostic, 49 skills with 23 playbooks and 23 principle leaves.
+model and provider agnostic, 56 skills with 23 playbooks and 24 principle leaves.
 `fan-out` is a small omp-native skill for wide parallel runs, written from measurement
 rather than doctrine.
 

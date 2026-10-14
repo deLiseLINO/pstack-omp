@@ -56,6 +56,50 @@ There is nothing to resolve. The build never edits an upstream file in place, so
 port text cannot collide. A patch that no longer applies exits 1, and that or a gate FAIL leaves the
 PR open for a human with both outputs in the body and the reason printed in the job log.
 
+### What catches upstream moving
+
+`rules.sed` is a table of exact rewrites, and a `sed` rule whose left-hand side stops matching
+changes nothing while still exiting 0. That is the one failure mode in this port that is silent by
+construction, so the gate treats it as the thing to prove rather than as an absence of errors. It
+asks two questions and needs both, because each has a large healthy population:
+
+- `rule liveness` runs one marked build and lists the rules that substituted nothing. Most of that
+  list is the point: the token rules sit underneath the whole-sentence rules and fire nothing
+  precisely because an earlier rule already consumed their input, and that redundancy is the net
+  that catches a whole-sentence rule when it misses.
+- `target builds` is the only upstream assertion that runs the whole build rather than probing
+  text. Every other one reads upstream directly, and none of them runs `omp-port/patches`, so
+  without it an upstream commit that rewords a line a patch matches on passes the gate and the sync
+  it clears cannot be applied. It is skipped when the target is the pin, because `reproducible` has
+  already built exactly that tree.
+- `rule staleness` applies each rule on its own to upstream as it stands, with the same `sed` and
+  the same `-E` the build uses, and intersects the result with the liveness list. Dead in isolation
+  *and* dead in the build is stale. Dead only in isolation is a rule fed by an earlier rule's
+  output and is ordinary. The intersection is why most rules need no exemption at all.
+
+A stale rule that upstream has outrun **fails** the gate. It is not a report, because the
+consequence is a Cursor API reaching a generated skill while every other check stays green. The
+fix is to correct the left-hand side against what upstream actually says now, or to record the rule
+in `omp-port/stale-exempt.tsv` with a reason. That file is keyed on a literal fragment of the rule
+and never on a line number, because a line number moves the moment anyone edits a rule above it and
+an exemption that silently stops applying is worse than no exemption.
+
+The probe's own exit status is part of the assertion for both. A probe that cannot run reports
+failure, not a clean result: an empty list from a failed build is not evidence that nothing is
+stale.
+
+`bash omp-port/check-port.sh [canonical-clone] [sha]` takes the sha to gate, defaulting to the pin.
+The tree assertions follow the pin, because they are about the checked-in tree; the upstream
+assertions follow the target, because they are about upstream text. That split is what makes an
+upstream change reviewable *before* it is synced: `upstream-sync` runs the gate a second time
+against the candidate sha, so a commit that outruns a rule stops the run with the rule named,
+rather than landing and being noticed later in a generated file. The same command answers the
+question locally:
+
+```bash
+bash omp-port/check-port.sh "" "$(gh api 'repos/cursor/plugins/commits?path=pstack&sha=main&per_page=1' --jq '.[0].sha')"
+```
+
 The gate runs as its own workflow, `gate.yml`, on every pull request and on every push to `main`. A
 PR opened with `github.token` does not trigger `pull_request` workflows, so the sync PR carries the
 gate output in its body and the `push` to `main` run after the merge is the backstop.
@@ -67,22 +111,26 @@ Never substitute the `backnotprop/pstack` mirror for upstream.
 These landed in syncs before the current pin and are recorded because each one still constrains what
 the port carries, not as a census of the tree. `omp-port/UPSTREAM` is the only current record.
 
+Everything below `pstack/skills` and `pstack/agents` is outside this port. The build is one
+`git archive` of exactly those two subtrees, so `.cursor-plugin/`, `docs/`, `assets/`, and
+`automations/` are structurally absent rather than carried and edited.
+
 - **Added** `skills/make-bot-ui/` (webhook-driven Grok Bot UI skill). Listed in the README skill
   table and installed as a skill here.
 - **Deleted** `skills/poteto-mode/references/plan.md`. Canonical replaced the prose reference with an
   executable checker, `skills/poteto-mode/scripts/check-plan.mjs`. Both moves are reflected on disk
   in this port.
-- **Added** `assets/logo.png` plus a `"logo": "assets/logo.png"` field in `.cursor-plugin/plugin.json`.
-  The 353 KiB PNG is **not carried**. It is a Cursor marketplace image with no omp consumer, nothing
-  in omp reads it, and no skill or doc links it. The manifest field is kept so `.cursor-plugin/plugin.json`
-  stays byte-identical to canonical and future drift diffs show only real changes. The consequence is
-  one unresolved relative path inside a file nothing on this machine parses.
-- Canonical also moved Shipping and Autopilot-stack off Graphite merge-when-ready to landing one PR at
-  a time "through GitHub by default or Origin when its CLI is available". That wording is ported into
-  `docs/guide/06-verify-and-ship.md`, `docs/guide/07-overnight.md`, and the README playbook table.
+- **Not carried** `assets/logo.png` and its `"logo": "assets/logo.png"` field. They are a Cursor
+  marketplace image with no omp consumer. An earlier tree vendored the manifest beside it so that
+  future drift diffs would show only real changes; that ended when the build narrowed to the two
+  subtrees it archives, so no dangling reference is left to fix here.
+- Canonical also moved Shipping and Autopilot-stack off Graphite merge-when-ready to landing one PR
+  at a time "through GitHub by default or Origin when its CLI is available". That wording reaches
+  this port through the two playbooks themselves, not through `docs/guide/`, which the build does
+  not extract.
 
-`.cursor-plugin/plugin.json` is kept for upstream fidelity only. omp never reads it. Editing the
-manifest changes no runtime behavior on this machine.
+`.cursor-plugin/plugin.json` is not vendored and never was in the current build: it sits outside the
+two subtrees `omp-port/lib.sh` archives, and omp never read it. Nothing in the tree parses it.
 
 ## Install, the two live shapes
 
@@ -103,9 +151,10 @@ The marketplace install is the user shape.
 
 That caches the plugin at `~/.omp/plugins/cache/plugins/pstack-omp___pstack___<version>` and links
 it at the same `~/.omp/plugins/node_modules/pstack` path. Verified on omp 18.1.13, 2026-09-07. The
-skills load, `fan-out` and `setup-pstack` enter the `<skills>` block and the rest hide, and the
-`potetomode` extension loads from `package.json` `omp.extensions`, so `--poteto` injects the
-reminder in `-p` mode.
+skills load, `setup-pstack` is among them and the rest hide, and both extensions register from
+`package.json` `omp.extensions`, so `--poteto` injects the reminder in `-p` mode. `fan-out` is not
+one of this plugin's 49: it ships as a second plugin in the same marketplace and takes its own
+`/marketplace install fan-out@pstack-omp`.
 
 The agents do not load from a marketplace root. omp scans a marketplace plugin's `agents/` directory
 only through the `claude-plugins` discovery provider, which is off by default
@@ -143,9 +192,57 @@ installed.
 the model slugs upstream names first and a catch-all under them whose hits the sync and the gate
 report as `untiered` so they earn a tiered rule. `omp-port/patches/` carries the port's own code as
 unified diffs applied after the rules, which is where a change no substitution can express belongs.
-`skills/omp-mechanics`, listed in `omp-port/owned.txt`, carries the port's prose, so the
-omp-specific levers sit in one skill the injected reminder points every agent at instead of being
-sprinkled through files upstream keeps rewriting.
+`omp-port/owned.txt` names three port-owned skills. `pstack-omp` is the sole live task, vibe, eval,
+and runtime contract. `omp-mechanics` keeps only pstack-specific OMP deltas, and `setup-pstack`
+owns model selection and config writes. Upstream syncs preserve these paths without rewriting them.
+
+### A patch rewrites code, never prose
+
+A unified diff matches on context lines, so a patch against upstream markdown is a bet that
+upstream will not retype the paragraph around the change. Upstream reworks its skill prose
+constantly: one commit inside a single sync window distilled 36 files. The patch this replaced was
+98% prose by byte count, across 25 markdown files, which is why every daily sync failed on patch
+application while `rules.sed` stayed clean.
+
+The split is by kind, not by size.
+
+- A token or a field name goes in `rules.sed`. `subagent_type`, `run_in_background`, `readonly`,
+  and Cursor's per-project rule-file path are matched as tokens rather than as sentences, so an
+  upstream reword cannot break them. This is what makes the layer durable: a rule that stops matching costs one
+  line, a patch that stops matching costs a merge.
+- Port prose goes in the owned skills, which `install_tree` restores from `HEAD` and which
+  therefore cannot conflict with upstream at all.
+- A patch is for code: control flow, a data shape, a file upstream does not have. Both remaining
+  patches touch a script, and one of them replaced two interlocking patches that had to be read
+  together to apply, because one wrote a transcript lookup the other deleted.
+
+Author a patch against **post-rules** text. `rules.sed` runs first, so a hunk quoting the raw
+upstream line fails whenever an earlier rule rewrote it. `worktree-audit-omp.patch` deletes a
+comment line that the path rule has already rewritten, and its hunk quotes the rewritten form.
+
+Two failure modes this caught, both silent until a sync ran. An owned path missing from
+`owned.txt` is not owned: `install_tree` rebuilds `plugins/pstack/skills` from upstream and
+restores only the listed paths, so dropping `skills/setup-pstack` shipped upstream's hardcoded
+model slugs. And a gate check that greps for a literal goes stale when upstream changes shape:
+upstream dropped the per-entry slug from its router index and documented the title-to-kebab rule in
+the index preamble instead, so both parity checks read every entry as unnamed and failed against a
+correct tree. They now derive the name the way the preamble tells the agent to.
+
+The gate used to assert that port-authored prose sat *inside* upstream's playbooks, which is the
+opposite of mirroring upstream and made every one of those assertions a rule that went stale. Those
+checks are gone. What remains is residue detection: Cursor wire fields, model slugs, retired role
+keys, install paths, and build integrity.
+
+`skills/setup-pstack` is port-owned, so the build restores it from `HEAD` and never rebuilds it from
+upstream. Upstream's version writes a Cursor rules file with no omp meaning, so the fork is
+deliberate, but the drift list alone does not mark it: an upstream edit to that skill shows up as an
+ordinary pstack commit with no patch conflict, no gate failure, and no reminder to re-derive it.
+`bash omp-port/sync-upstream.sh check` therefore writes a `shadowed <path>:` line per owned path to
+stderr, counting the upstream commits sitting ahead of the pin on that path. Every one of them is
+unapplied by construction, since the build restores the path from `HEAD`; the count is what tells
+you how much upstream moved underneath you. A non-zero count on `skills/setup-pstack` means re-derive
+the selection procedure by hand before trusting the skill; the two other owned paths have no
+upstream counterpart and always report as port-only.
 
 Known deltas the port mirrors faithfully and will not diverge on. The guide says the verification feature map lives at `references/features` while both trees write `features/`. The guide recommends a daily `/maintain-verification-skill` run while both trees state no cadence.
 
@@ -169,15 +266,39 @@ The injected reminder is a pointer, not the playbook. It tells the agent to read
   anti-worktree argument about storage cost is about plain `git worktree` copies, and COW clones on
   this btrfs box do not carry it, so Cursor cloud agents are a bigger machine here rather than a
   missing capability.
-- **The control CLI's driving surface.** `browser` (CDP, `tab.observe`/`screenshot`/`evaluate`),
-  `computer` (native desktop plus a11y tree), `hub` (`op:start` with `ready:{log,port}` readiness),
-  `debug` (full DAP, breakpoints, eval, stack). A generated `control-<app>` script only needs
-  app-specific semantics, `doctor`, `new-session`, `seed`/auth, `feature-flag`, `wait-settle`.
+- **The control CLI's driving surface.** `browser` (CDP, `tab.observe`/`screenshot`/`evaluate`) and
+  `computer` (native desktop plus a11y tree) are eval preludes, not tools. Long-running processes
+  are a `bash` call with a unique `name`, a `ready` block, and `read proc://<name>` for state. The
+  `name` selects supervised service mode and is incompatible with `async: true` or a supplied
+  `timeout`; `async` is the other backgrounding path, for a finite command, and it hands back a job
+  id read at `proc://<id>`. Two mechanisms, not two flags on one call.
+  Agent Hub is a human-facing TUI, not a programmatic interface, so nothing addresses workers
+  through it. `debug` is full DAP with breakpoints, eval, and stack. A generated `control-<app>`
+  script only needs app-specific semantics, `doctor`, `new-session`, `seed`/auth, `feature-flag`,
+  `wait-settle`.
 - **`swarm` / `arena` / `interrogate`.** One `task` call with a `tasks[]` batch,
   `task.maxConcurrency=100`, `isolated: true` per candidate, `outputSchema` for judged verdicts.
-- **Never-block.** Subagents run `approvalMode: yolo`, and `proofgate`'s `session_stop` veto is the
-  enforced backstop.
-- **Sibling coordination.** Same-session `hub` `send`, `wait`, and `inbox` ship in the harness and are the sanctioned primitive when workers must coordinate instead of running independent. Pstack never calls them yet. Cross-session messaging does not exist locally and gets no workaround here. It is tracked upstream and stays open.
+- **Never-block.** Subagents run `approvalMode: yolo`, so a worker cannot stop to ask. **Nothing
+  here vetoes a malformed subagent result.** The plugin ships two extensions, `potetomode` and
+  `pstackpolicy`, and neither one registers a `session_stop`; `pstackpolicy` vetoes at `tool_call`
+  and only for the forge mutations, so a result that is merely wrong still gets through. What
+  pstack relies on for that is the root's own acceptance discipline: `skill://pstack-omp` requires
+  the root to read each result and accept or reject it, and a `judge`/`verifier` role is the
+  independent check on a worker's claim. That is the whole backstop for a malformed result. Landing
+  is a separate gate and it is enforced in process rather than in prose; see
+  [What omp can actually stop](#what-omp-can-actually-stop) below.
+  Returning `{"decision":"block"}` from `session_stop` is the one native veto contract, and
+  `~/.omp/agent/extensions/proofgate/` implements it, dormant unless `$OMP_PROOF_FILE` is set, so
+  treat the veto as absent unless you have verified that variable yourself. Its own `VERDICT.md`
+  prefers an external check over it and calls the case unmeasured, so treat it as a local
+  experiment rather than the answer. This repository neither ships nor requires it.
+- **Sibling coordination.** `write agent://<id>` steers or follows up with a running, idle, or parked
+  worker, `agent://all` broadcasts to visible live peers, `read history://` lists registered agents
+  with status and parent, and `read proc://` lists background jobs and project services. These are
+  the sanctioned primitives when workers must coordinate instead of running independent. The
+  orchestrator uses its own TSV store and `orch inbox` for the queue instead, so sibling messaging
+  stays unused there. Cross-session messaging does not exist locally and gets no workaround here. It
+  is tracked upstream and stays open.
 
 ## Still missing in omp
 
@@ -188,7 +309,7 @@ patches, or conflicts, because omp already does.
 
 ## Next action
 
-The verification skill is generated, not ported. Run `/create-verification-skill` inside a real repo,
+The verification skill is generated, not ported. Run `skill://create-verification-skill` inside a real repo,
 which writes `<repo>/.omp/skills/verify-<app>/` (SKILL.md plus control script plus a `features/`
 feature map), then `/maintain-verification-skill` on a schedule. Pick a repo with a runnable UI. A
 React or Vite app with a dev server is the easiest first target.
@@ -241,3 +362,31 @@ thinking id for judgment work.
   natively, both injectors will fire and collide, and the extension should be deleted or gated at
   that point. The same rule applies to every capability in this document. State the probe, not the
   version.
+
+### What omp can actually stop
+
+The playbooks say "stop where the human's call begins", and until recently that was advice with
+nothing behind it. Three facts from `omp://approval-mode.md`, on omp 18.4.10, decide what an
+instruction is worth here:
+
+- `yolo` auto-approves the `read`, `write`, **and `exec`** tiers. A `gh pr merge` inside a bash
+  call is an `exec` call, so it runs with no prompt.
+- Subagents run headless with `tools.approvalMode: yolo`, and "the parent `task` approval is the
+  authorization boundary". Every pstack owner is a subagent, so the boundary is the spawn, not the
+  instruction.
+- A call that resolves to `prompt` is **rejected** in a headless subagent, because there is no one
+  to answer it. A backstop therefore has to *refuse*, not prompt.
+
+bash's built-in critical-pattern list covers `rm -rf /`, fork bombs, remote-fetch-then-execute,
+`/etc/passwd`, and host shutdown. **A merge is not on it.** So is not a force-push to trunk, a base
+retarget, a PR close, or a review comment.
+
+That is why the port now ships `plugins/pstack/extensions/pstackpolicy`, a second extension beside
+the mode pin. It registers `tool_call` and refuses the forge mutations outright unless the operator
+set `PSTACK_LANDING_GRANT=1`. The grant is an environment variable rather than a flag or a slash
+command because a flag an agent can pass is not a grant a human made, and an agent cannot set its
+own process environment. Refusals name the variable, so the operator is told exactly what to set.
+
+A force push to a **feature** branch stays allowed: that is the port's own rebase flow, and blocking
+it would fail every stack owner mid-rebase and make the extension unusable without a grant. A force
+push that names a trunk ref is refused, which is the case the playbooks keep escalating.
