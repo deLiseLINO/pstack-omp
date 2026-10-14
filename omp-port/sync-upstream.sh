@@ -89,6 +89,10 @@ do_build() {
 
 	read -r n p k < <(port_counts plugins/pstack)
 	write_json plugins/pstack/package.json --arg v "$version" '.version = $v'
+	# The manifest is copied from upstream, so its version can only lag if upstream forgot to bump
+	# it. Setting it here makes the pin the single source of truth for both manifests.
+	[ -f plugins/pstack/plugin.json ] &&
+		write_json plugins/pstack/plugin.json --arg v "$version" '.version = $v'
 	write_json .omp-plugin/marketplace.json --arg v "$version" \
 		--arg d "$n skills, $p playbooks, $k principles, the poteto-mode pin, and two agents. Upstream cursor/plugins pstack at ${sha:0:7}." \
 		'.metadata.version = $v

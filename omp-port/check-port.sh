@@ -520,6 +520,27 @@ else
 	report "owned" "PASS  $ownn owned path(s) present"
 fi
 
+# Upstream ships an Agent Plugins manifest so the plugin loads in any harness. The port copies it
+# through rather than rewriting it, because it is pure metadata: it names the plugin and says
+# nothing about how a task is spawned. Its absence is not visible anywhere else, so it is asserted
+# here. A manifest whose version disagrees with the pin means one of the two was written by hand.
+mfbad=""
+if [ ! -f plugin.json ]; then
+	mfbad="plugins/pstack/plugin.json missing; upstream's Agent Plugins manifest is not carried through"
+elif ! jq -e . >/dev/null 2>&1 <plugin.json; then
+	mfbad="plugins/pstack/plugin.json is not valid JSON"
+elif [ "$(jq -r '.version // empty' <plugin.json)" != "$(jq -r '.version' <package.json)" ]; then
+	mfbad="plugin.json version $(jq -r '.version // "none"' <plugin.json) disagrees with package.json $(jq -r '.version' <package.json)"
+elif [ "$(jq -r '.name // empty' <plugin.json)" != "pstack" ]; then
+	mfbad="plugin.json name is $(jq -r '.name // "none"' <plugin.json), not pstack"
+fi
+if [ -n "$mfbad" ]; then
+	report "plugin manifest" "FAIL"
+	while read -r m; do [ -n "$m" ] && violate "$m"; done <<<"$mfbad"
+else
+	report "plugin manifest" "PASS  Agent Plugins manifest present and version-matched"
+fi
+
 # Owning a path makes an upstream edit to it vanish silently, so the count is surfaced on every gate
 # run instead of being discovered later. A non-zero count is a maintainer decision, not a failure:
 # the built copy is discarded by design, which is what owning a path means. It says nothing when the
