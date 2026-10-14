@@ -293,6 +293,10 @@ s#Agents are spawned, resumed, and drained only through the Task tool\.#Agents a
 s#^Use this reference when the Babysit playbook \(`\.\./playbooks/babysit\.md`\) handles Bugbot or review-automation comments\.#Use this reference when the Babysit playbook (`../playbooks/babysit.md`) handles Bugbot or review-automation comments. Bugbot is Cursor's hosted review product, so without it this rubric applies to whatever review bot posts on your PRs, including omp's own `security-reviewer`.#
 s#`,? in place of the `(arena|architect|swarm|interrogate) reviewers?` line##g
 s#the `arena cross-judge pool` line in the `pstack-models\.mdc` rule#an exact discovered judge agent whose configured model differs from the parent's when the roster provides one#g
+# Upstream's effort-matching step names the role's own line, which is a Cursor key on omp. The
+# capability it stands for is the budget the setup skill writes, so point there instead.
+s#the role.s line or default#the role's entry in `~/.omp/agent/config.yml`, or its default#g
+s#the `swarm workers` model and speed \(your fast code model by default\)#the swarm role's own entry and speed#g
 s#the `(architect|arena|swarm|interrogate) runners` line in the `pstack-models\.mdc` rule#the exact discovered runner agents#g
 s#the `interrogate reviewers` line in the `pstack-models\.mdc` rule#one exact discovered reviewer agent per configured entry#g
 s#the `arena cross-judge pool` line in `~?/?\.cursor/rules/pstack-models\.mdc`#an exact discovered judge agent whose configured model differs from the parent's when the roster provides one, in `~/.omp/agent/config.yml`#g
@@ -365,7 +369,7 @@ s#Subagents inherit it\. Multiple `Task` calls on the same branch each get their
 # forgot: upstream added eighteen skills after it was written and every one of them shipped a bare
 # /name the gate could not accept. Adding a skill upstream now means adding its name to the
 # alternation, once.
-s#`/(teach|recall|reflect|tdd|swarm|arena|interrogate|correct|setup-pstack|automate-me|figure-it-out|show-me-your-work|benchmark-checklist|blast-radius|ketchup|bro|make-bot-ui|poteto-help|no-comments|unslop|create-verification-skill|maintain-verification-skill|architect|why|how|technical-writing|typescript-best-practices|poteto-mode|principle-[a-z-]+)`#`/skill:\1`#g
+s#`/(teach|recall|reflect|tdd|swarm|arena|interrogate|correct|setup-pstack|automate-me|figure-it-out|show-me-your-work|benchmark-checklist|blast-radius|ketchup|bro|make-bot-ui|poteto-help|no-comments|unslop|create-verification-skill|maintain-verification-skill|architect|why|how|technical-writing|sharpen|in-your-own-words|typescript-best-practices|poteto-mode|principle-[a-z-]+)`#`/skill:\1`#g
 # One verdict vocabulary. pstack-omp and swarm both name PASS/ISSUES/BLOCKED; shipping named a
 # different three, and its landing rule tested for a different set, so a verifier told by one file
 # and checked by another could not satisfy both.

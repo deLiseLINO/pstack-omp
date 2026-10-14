@@ -458,8 +458,11 @@ for s in create-verification-skill maintain-verification-skill swarm poteto-mode
 done
 grep -qi 'features' skills/create-verification-skill/SKILL.md ||
 	unclaimed="$unclaimed""create-verification-skill must build the Feature Map (references/features)"$'\n'
-grep -q 'mode: true' skills/poteto-mode/SKILL.md ||
-	unclaimed="$unclaimed""poteto-mode must carry the Custom Mode pin frontmatter"$'\n'
+# Upstream dropped `mode: true` from the frontmatter on purpose (b93e811) and omp never modelled
+# that key, so asserting it here only asserted a line upstream removed. The pin is the extension,
+# which is the thing that actually registers the command.
+grep -q 'registerCommand("poteto-mode"' extensions/potetomode/index.js ||
+	unclaimed="$unclaimed""the potetomode extension must register /poteto-mode"$'\n'
 if [ -n "$unclaimed" ]; then
 	report "guide claims" "FAIL"
 	while read -r c; do [ -n "$c" ] && violate "$c"; done <<<"$unclaimed"
