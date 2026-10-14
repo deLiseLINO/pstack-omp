@@ -85,4 +85,4 @@ SOFTWARE.
 
 ## negoro26 OMP port
 
-Catalog, extension, gate tooling and optional fan-out guidance derive from [negoro26/pstack-omp](https://github.com/negoro26/pstack-omp). The root LICENSE retains Lauren Tan’s upstream MIT notice.
+Catalog, extension and gate tooling derive from [negoro26/pstack-omp](https://github.com/negoro26/pstack-omp). The root LICENSE retains Lauren Tan's upstream MIT notice.

@@ -152,9 +152,7 @@ The marketplace install is the user shape.
 That caches the plugin at `~/.omp/plugins/cache/plugins/pstack-omp___pstack___<version>` and links
 it at the same `~/.omp/plugins/node_modules/pstack` path. Verified on omp 18.1.13, 2026-09-07. The
 skills load, `setup-pstack` is among them and the rest hide, and both extensions register from
-`package.json` `omp.extensions`, so `--poteto` injects the reminder in `-p` mode. `fan-out` is not
-one of this plugin's 49: it ships as a second plugin in the same marketplace and takes its own
-`/marketplace install fan-out@pstack-omp`.
+`package.json` `omp.extensions`, so `--poteto` injects the reminder in `-p` mode.
 
 The agents do not load from a marketplace root. omp scans a marketplace plugin's `agents/` directory
 only through the `claude-plugins` discovery provider, which is off by default
