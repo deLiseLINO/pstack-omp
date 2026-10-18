@@ -11,7 +11,7 @@ Wide parallel runs are a `swarm` dispatch, not a separate plugin.
 /marketplace install pstack@pstack-omp
 ```
 
-The marketplace install loads the skills and both extensions, `potetomode` and `pstackpolicy`. It
+The marketplace install loads the skills and the `potetomode` extension. It
 does not load the two agents; see the agent step in `plugins/pstack/README.md`.
 
 `PORTING.md` is the full porting record. `omp-port/check-port.sh` is the gate the port

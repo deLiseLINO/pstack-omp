@@ -375,9 +375,6 @@ s#stop at the first one without a passing verdict, where both `PASS` and `PASS\+
 ## 10. Irreversible actions, and what the runtime actually enforces. Every replacement below
 ## exists because the original either contradicted another sentence in the same tree, named a
 ## surface omp does not have, or told an agent to do something the harness cannot stop. The
-## machine half is plugins/pstack/extensions/pstackpolicy, which refuses the forge mutations
-## unless the operator set PSTACK_LANDING_GRANT; prose alone cannot, because yolo auto-approves
-## the exec tier and every pstack owner is a headless subagent.
 
 # Landing is the one action the port routes a human toward and then never gated. The --auto branch
 # of this same step already carries "and the user asked"; the immediate branch did not, so an agent
@@ -426,10 +423,6 @@ s#push with `--force-with-lease` only after an `ls-remote` check, and set the PR
 # in the stack, so an unguarded retarget here reaches the whole chain.
 s#4\. \*\*Prepare only the bottom PR\.\*\* Fetch current trunk\.#4. **Prepare only the bottom PR**, and retarget only on the operator's explicit go: an operator approval to land a PR is not approval to rewrite the base of every PR above it. Fetch current trunk.#
 
-# The autonomy sentence contradicted the pause-list scope added in section 10, and the index routes
-# "full autopilot" straight here, so the trigger phrase the operator types is the phrase that clause
-# disqualified.
-s#The operator's full-autonomy grant plus the root's clean verdict is the merge authorization that babysitting alone never has\.#A full-autonomy grant authorises the owner to keep working without checking in; the root's clean verdict authorises a merge only inside that grant. Neither is implied by "go faster", and both still require the operator to have armed PSTACK_LANDING_GRANT for the merge itself.#
 
 # `trash` is macOS, so the step could not be followed on this host, and the sentence forbade the one
 # fallback that would work. Handled in zz-live-runtime-routing.patch instead, because that line is
@@ -492,8 +485,7 @@ s#(the system prompt names the path)#(`history://<id>` is the documented surface
 
 # The `how` skill has no modes. It branches on Step 2a Explore / Step 2b Direct Explain.
 
-# Unqualified force-push blocks the port's own rebase flow, which `pstackpolicy` explicitly permits
-# and `autopilot-stack` prescribes. Scope the pause the way the rest of the port scopes it.
+# Scope force-push approval to shared and trunk branches, not the feature-branch rebase flow.
 s#(force-push, delete production data, send external messages)#(force-push to a shared or trunk branch, delete production data, send external messages)#
 
 s#`/create-formal-verification-skill`#`/skill:create-formal-verification-skill`#g

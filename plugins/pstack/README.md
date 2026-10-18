@@ -18,7 +18,7 @@ OMP extensions.
 /marketplace install pstack@pstack-omp
 ```
 
-That loads the 57 skills and both extensions, `potetomode` and `pstackpolicy`. The two agents are optional.
+That loads the 57 skills and the `potetomode` extension. The two agents are optional.
 On omp 18.1.13 a marketplace plugin's `agents/` directory is scanned only through the
 `claude-plugins` discovery provider, and enabling that provider also loads every Claude Code
 plugin cached under `~/.claude/plugins`. Link the agents into omp's native root instead:
@@ -40,22 +40,12 @@ Use these optional agents only when the live roster lists them; otherwise the ad
 
 Then `/poteto-mode on`, or `alt+shift+t`, or `omp -p --poteto '...'` for headless runs.
 
-## What the policy extension refuses
+## Policy removal
 
-`pstackpolicy` loads with the plugin and needs no configuration. It registers `tool_call` on `bash`
-and `eval`, and refuses the forge mutations the playbooks only ask for in prose: `gh pr merge`,
-merge and close through `gh api`, `gh pr close|reopen|delete`, `gh pr edit --base`, `gh pr review`,
-merge-when-ready, `gh repo delete`, `gh release create|delete|upload`,
-`gh secret|variable set|delete`, `gh workflow run --ref <trunk>`, the same forge calls made with
-`curl`, and `gt submit|rebase|restack`. Locally it refuses `git update-ref`, `git branch -D`,
-`git reset --hard` against a remote, and `git reflog expire --expire=now --all`. Any `git push`
-whose refspec lands on `main`, `master`, `trunk`, `develop`, or `release` is refused, forced or not;
-a force push to a feature branch stays allowed, because that is the port's own rebase flow.
-
-To land, set `PSTACK_LANDING_GRANT=1` in the environment omp starts from. It is an environment
-variable and not a flag or a slash command because a flag an agent can pass is not a grant you made.
-The refusal names the variable, so the agent tells you exactly what to set. `PORTING.md`'s
-"What omp can actually stop" carries the measurement behind the list.
+The fork-specific command blocker has been removed at the operator's request.
+No landing environment variable is required. The mode pin and engineering workflows remain.
+User approval rules and OMP's own permissions still apply.
+Future updates must preserve this removal. Do not restore the command blocker or its environment-variable requirement.
 
 ## What this plugin does not enforce
 
