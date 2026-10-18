@@ -55,14 +55,15 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null 2>&1 || { echo "error
 # PR state by branch, fetched once as [{number, state, head}] with a lowercase
 # state. Origin when its CLI can read this repo's PRs, otherwise gh. Empty when
 # neither can.
-scratch_dir="${TMPDIR:-$repo/.pstack-scratch}/worktree-audit"
-mkdir -p "$scratch_dir"
-prs=$(mktemp "$scratch_dir/prs.XXXXXX")
-trap 'rm -f "$prs"' EXIT INT TERM
+scratch_dir=$(mktemp -d "${TMPDIR:-/tmp}/worktree-audit.XXXXXX") || exit 1
+prs="$scratch_dir/prs"
+trap 'rm -rf "$scratch_dir"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if command -v origin >/dev/null 2>&1 \
 	&& raw=$(origin pr list --author "@me" --state all --limit 1000 \
 		--json number,status,headRef 2>/dev/null); then
-	printf '%s' "$raw" | jq '[.[] | {number, state: .status, head: .headRef}]' > "$prs" 2>/dev/null
+	printf '%s' "$raw" | jq '[.[] | {number, state: (.status | ascii_downcase), head: .headRef}]' > "$prs" 2>/dev/null
 elif raw=$(gh pr list --author "@me" --state all --limit 1000 \
 	--json number,state,headRefName 2>/dev/null); then
 	printf '%s' "$raw" | jq '[.[] | {number, state: (.state | ascii_downcase), head: .headRefName}]' > "$prs" 2>/dev/null
@@ -71,10 +72,27 @@ fi
 
 # omp keys each session tree by cwd. Scan this worktree's bucket and the repo's; walking every
 # bucket would scale with total session history.
-sessions="${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions"
-bucket() { printf '%s/%s' "$sessions" "$(printf '%s' "${1#"$HOME"}" | sed 's#/#-#g')"; }
+# For non-default omp profiles, set PI_CODING_AGENT_SESSION_DIR to the selected
+# profile's sessions root. This script does not guess the active profile.
+sessions="${PI_CODING_AGENT_SESSION_DIR:-${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions}"
+temp_root=$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)
+bucket() {
+	local cwd encoded
+	cwd=$(cd "$1" 2>/dev/null && pwd -P) || cwd="$1"
+	case "$cwd" in
+	"$HOME"|"$HOME"/*) encoded=$(printf '%s' "${cwd#"$HOME"}" | tr '/' '-') ;;
+	"$temp_root"/*) encoded="-tmp-$(printf '%s' "${cwd#"$temp_root"/}" | tr '/' '-')" ;;
+	*) encoded="--$(printf '%s' "$cwd" | tr '/' '-')--" ;;
+	esac
+	printf '%s/%s' "$sessions" "$encoded"
+}
 repo_bucket=$(bucket "$main_wt")
-[ -d "$repo_bucket" ] || repo_bucket="$sessions"
+file_timestamp() {
+	stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1" 2>/dev/null
+}
+chat_date() {
+	date -d "@$1" '+%Y-%m-%d' 2>/dev/null || date -r "$1" '+%Y-%m-%d' 2>/dev/null
+}
 now=$(date +%s)
 
 echo "# base: $base"
@@ -89,7 +107,7 @@ printf '%s\n' "$worktree_records" | awk '/^worktree /{sub(/^worktree /, ""); pri
 			for (i = 1; i <= NF; i++) {
 				if ($i ~ /^locked/) {
 					reason = substr($i, 8)
-					print reason == "" ? "yes" : reason
+					print (reason == "" ? "yes" : reason)
 					exit
 				}
 			}
@@ -133,13 +151,17 @@ printf '%s\n' "$worktree_records" | awk '/^worktree /{sub(/^worktree /, ""); pri
 	# Most recent chat whose transcript operated in this worktree. Match path
 	# followed by "/" or a quote so glint-482 does not match glint-482-r37.
 	last="-"; last_ts=0
-	wt_bucket=$(bucket "$wt"); [ -d "$wt_bucket" ] || wt_bucket="$repo_bucket"
-	if [ -d "$repo_bucket" ]; then
-		f=$(rg -l -e "${wt}/" -e "${wt}\"" "$repo_bucket" "$wt_bucket" 2>/dev/null \
-			| xargs -r stat -c '%Y %n' 2>/dev/null | sort -rn | head -1)
-		if [ -n "$f" ]; then last_ts=$(echo "$f" | awk '{print $1}')
-			last=$(date -d @"$last_ts" '+%Y-%m-%d' 2>/dev/null); fi
-	fi
+	wt_bucket=$(bucket "$wt")
+	for session_bucket in "$repo_bucket" "$wt_bucket"; do
+		[ -d "$session_bucket" ] || continue
+		while IFS= read -r -d '' transcript; do
+			grep -F -q -e "${wt}/" -e "${wt}\"" "$transcript" 2>/dev/null || continue
+			ts=$(file_timestamp "$transcript") || continue
+			if [ "$ts" -gt "$last_ts" ] 2>/dev/null; then last_ts="$ts"; fi
+		done < <(find "$session_bucket" -type f -name '*.jsonl' -print0 2>/dev/null)
+		[ "$wt_bucket" = "$repo_bucket" ] && break
+	done
+	if [ "$last_ts" -gt 0 ]; then last=$(chat_date "$last_ts") || last="?"; fi
 	recent=$([ "$last_ts" -gt 0 ] 2>/dev/null && [ $(( (now - last_ts) / 86400 )) -le 4 ] && echo yes || echo no)
 
 	if [ "$inspect" != ok ]; then bucket=hold-error
@@ -150,7 +172,7 @@ printf '%s\n' "$worktree_records" | awk '/^worktree /{sub(/^worktree /, ""); pri
 		wip:*) bucket=hold-wip ;;
 		*)
 			case "$pr" in
-			*OPEN*) bucket=hold-open-pr ;;
+			*/open|*/draft) bucket=hold-open-pr ;;
 			*)
 				if [ "$recent" = yes ]; then bucket=verify-recent-chat
 				elif [ "$merged" = YES ] || [ "$pr" != "-" ]; then bucket=safe
@@ -159,7 +181,7 @@ printf '%s\n' "$worktree_records" | awk '/^worktree /{sub(/^worktree /, ""); pri
 		esac
 	fi
 
-	printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
-		"$size" "$age" "$merged" "$dirty" "$remote" "$pr" "$last" "$bucket" "$wt"
+	printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+		"$size" "$age" "$merged" "$dirty" "$lock" "$inspect" "$remote" "$pr" "$last" "$bucket" "$wt"
 done | sort -t$'\t' -k1,1 -rh
 

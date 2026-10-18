@@ -14,6 +14,15 @@ OMP extensions.
 The incomplete `make-bot-ui` skill and its references are removed. Builds exclude it because
 its Cursor webhook automation has no OMP implementation. Future syncs must keep it excluded.
 
+## OMP correctness fixes
+
+Worktree cleanup keeps open and draft pull requests, locked worktrees, and unreadable worktrees.
+Its report includes every declared column and reads session timestamps on Linux and macOS.
+History and delegation instructions use OMP's session format and live agent roster.
+Help links and pin shortcuts match OMP. Precommit checks use explicit project commands and do not
+launch an automatic code-fixing agent.
+
+
 ## Install
 
 ```
