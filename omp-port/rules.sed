@@ -492,3 +492,4 @@ s#`/create-formal-verification-skill`#`/skill:create-formal-verification-skill`#
 s#^pstack is built for Cursor, and it also installs in Claude Code.*$#This port runs in OMP. Install it with `/marketplace add negoro26/pstack-omp`, then `/marketplace install pstack@pstack-omp`. Read `skill://pstack-omp` for the live tool mapping.#
 s#^Other tools can read the skills, because they use the Agent Skills format.*$#The engineering workflows come from upstream. `skill://pstack-omp` maps worker execution and lifecycle to OMP; `skill://setup-pstack` configures OMP models, and the mode extension preserves the session pin.#
  
+/^\|.*make-bot-ui.*\|$/d

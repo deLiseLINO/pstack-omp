@@ -115,8 +115,8 @@ Everything below `pstack/skills` and `pstack/agents` is outside this port. The b
 `git archive` of exactly those two subtrees, so `.cursor-plugin/`, `docs/`, `assets/`, and
 `automations/` are structurally absent rather than carried and edited.
 
-- **Added** `skills/make-bot-ui/` (webhook-driven Grok Bot UI skill). Listed in the README skill
-  table and installed as a skill here.
+- **Excluded** `skills/make-bot-ui/` at the operator's request. Its Cursor webhook automation
+  has no OMP implementation. The build excludes the skill and removes its help entry.
 - **Deleted** `skills/poteto-mode/references/plan.md`. Canonical replaced the prose reference with an
   executable checker, `skills/poteto-mode/scripts/check-plan.mjs`. Both moves are reflected on disk
   in this port.

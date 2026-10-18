@@ -57,6 +57,7 @@ extract_upstream() {
 	local sha="$1" work="$2"
 	git -C "$CANON" archive "$sha" pstack/skills pstack/agents |
 		tar -x --strip-components=1 -C "$work" || return 1
+	rm -rf "$work/skills/make-bot-ui" || return 1
 	[ -d "$work/skills" ] && [ -d "$work/agents" ]
 }
 

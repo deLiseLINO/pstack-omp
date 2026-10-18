@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "pstack",
-      "description": "57 skills, 23 playbooks, 24 principles, the poteto-mode pin, and two agents. Upstream cursor/plugins pstack at f9be7aa.",
+      "description": "56 skills, 23 playbooks, 24 principles, the poteto-mode pin, and two agents. Upstream cursor/plugins pstack at f9be7aa.",
       "version": "0.15.27",
       "category": "development",
       "license": "MIT",
