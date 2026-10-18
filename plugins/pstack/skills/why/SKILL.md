@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Investigate the motivation and intent behind code. The companion `how` skill answers what the code does and how it works. `why` answers what forces led to its shape.
 
-Resolve agents against the live roster. Use an exact preferred agent only when it is present; otherwise follow the workflow's default-worker fallback. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects its model; the task item has no `model` field. Use the reasoning and speed already selected by agent frontmatter or exact `task.agentModelOverrides` entries. Do not change operator configuration to satisfy a skill example.
+Resolve agents against the live roster. Use an exact preferred agent only when it is present; otherwise follow the workflow's default-worker fallback. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects its model; use the configured role model and do not pass a per-call model override. Use the reasoning and speed already selected by agent frontmatter or exact `task.agentModelOverrides` entries. Do not change operator configuration to satisfy a skill example.
 
 Use exact discovered investigators and a synthesizer from the live roster. Omit `agent` for the default worker when no matching specialist is loaded. MCP tools are inherited, including by `scout`; choose a worker whose exposed tools cover the assigned evidence source. Carry read-only posture in each brief: no file writes, git mutations, commits, pushes, PRs, or external mutations. There is no task `readonly` field.
 

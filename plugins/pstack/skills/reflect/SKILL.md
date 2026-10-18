@@ -24,7 +24,7 @@ OMP stores flat `<timestamp>_<session-id>.jsonl` root sessions and `<session-ste
 
 Start the three lenses in one `task` call with three items in `tasks[]` and the required shared `context`. Resolve exact discovered judgment, tooling, and divergent agents; omit `agent` for the default worker with the corresponding lens brief when a specialist is absent. Keep independent contexts. Prefer different configured model families, especially for Divergent versus Judgment, only when the roster supplies them; report weaker diversity otherwise. Reviewers may use inherited MCP tools for read-only citation checks. The brief forbids mutations; there is no task `readonly` field.
 
-Resolve exact discovered agent names for the three lenses and the synthesizer. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; the task item has no `model` field. Use the reasoning and speed already selected by agent frontmatter or exact `task.agentModelOverrides` entries. Do not change operator configuration to satisfy a skill example.
+Resolve exact discovered agent names for the three lenses and the synthesizer. Each agent's frontmatter or `task.agentModelOverrides[<exact-name>]` selects the model; use the configured role model and do not pass a per-call model override. Use the reasoning and speed already selected by agent frontmatter or exact `task.agentModelOverrides` entries. Do not change operator configuration to satisfy a skill example.
 
 | Lens | Exact agent | Prompt template |
 |---|---|---|

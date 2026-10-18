@@ -533,3 +533,5 @@ s#`Task`#`task`#g
 s#the Task tool#the `task` tool#g
 s#the full Task schema#the live `task` schema#g
 
+s#the task item has no `model` field#use the configured role model and do not pass a per-call model override#g
+s#The task item has no `model` field\.#Use the configured role model and do not pass a per-call model override.#g
