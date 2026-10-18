@@ -6,20 +6,20 @@ before trusting this file after an upgrade.
 
 ## The root
 
-Resolved, not fixed. The default is `~/.omp/agent/sessions/`. `PI_CODING_AGENT_SESSION_DIR` and an
-explicit session-directory argument win, then `PI_CODING_AGENT_DIR` for the default profile, then
-the profile root under `PI_CONFIG_DIR`, then `XDG_DATA_HOME`, which redirects only when its `omp`
-root already exists. Resolve it once instead of hardcoding it.
+Resolved, not fixed. The default root is `~/.omp/agent/sessions/`, with one bucket per cwd.
+`PI_CODING_AGENT_SESSION_DIR` or an explicit session-directory argument selects the directory
+containing transcript files directly. Do not append a cwd bucket to that explicit directory.
+Without an explicit directory, resolve the profile root from `PI_CODING_AGENT_DIR`, the selected
+profile under `PI_CONFIG_DIR`, or `XDG_DATA_HOME` when its `omp` root exists, then select its cwd bucket.
 
 ## The bucket name
 
 One bucket per canonicalized cwd, so two symlinked spellings of one directory share a bucket.
 
+- A cwd under the temp root becomes `-tmp-<rest>`. This takes precedence if the temp root is under `$HOME`.
 - A cwd under `$HOME` becomes the home-relative path with each `/` rewritten to `-`. The leading
-  separator survives as a leading hyphen, so `/home/you/Desktop/proj` is `-Desktop-proj` and
-  `/home/you/.omp/pstack` is `-.omp-pstack`.
-- A cwd under the temp root becomes `-tmp-<rest>`.
-- Anything else becomes `--<encoded-absolute>--`.
+  separator survives as a leading hyphen, so `/home/you/Desktop/proj` is `-Desktop-proj`.
+- Anything else strips the leading separator and becomes `--<encoded-absolute>--`.
 
 Two distinct paths that encode identically share one bucket unless the live runtime separates them.
 Probe the current store after an upgrade. Older stores may contain a short-lived hashed form,

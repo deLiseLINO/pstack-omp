@@ -150,11 +150,12 @@ fi
 
 runtime_contract() {
 	local bad label pattern
-	for label in per-call-model pstack-rule-file task-environment; do
+	for label in per-call-model pstack-rule-file task-environment history-layout; do
 		case "$label" in
-		per-call-model) pattern='subagent_type|run_in_background|`model`:\s*[^f]|Set `model`|set `model` to|with `model` from|omit `model` so' ;;
+		per-call-model) pattern='subagent_type|run_in_background|generalPurpose|`Task`|`model`:\s*[^f]|Set `model`|set `model` to|with `model` from|omit `model` so|and `model` set|Omit `model` for' ;;
 		pstack-rule-file) pattern='pstack-models\.mdc' ;;
 		task-environment) pattern='environment:[[:space:]]*"?((local)|(cloud))\b|cloud_base_branch' ;;
+		history-layout) pattern='read the first JSONL line|legacy flat|<parent>/subagents/<child>|agent-transcripts/` directory the system prompt' ;;
 		esac
 		bad=$(grep -rInE "$pattern" --include='*.md' --include='*.mjs' --include='*.ts' --include='*.sh' "${SCOPE[@]}" 2>/dev/null || true)
 		if [ -n "$bad" ]; then
@@ -355,15 +356,15 @@ else
 	rm -f "$mutation_log"
 fi
 
-missing=""
-while read -r p; do
-	[ -e "skills/poteto-mode/$p" ] || missing="$missing $p"
-done < <(grep -rohE 'playbooks/[a-z-]+\.md|references/[a-z-]+\.md' skills/poteto-mode --include='*.md' | sort -u)
-if [ -n "$missing" ]; then
+if ! missing=$(python3 "$PORT_DIR/check-links.py" "$PWD" 2>&1); then
 	report "internal links" "FAIL"
-	for m in $missing; do violate "dangling: $m"; done
+	if [ -n "$missing" ]; then
+		while IFS= read -r link; do violate "dangling: $link"; done <<<"$missing"
+	else
+		violate "link checker failed without output"
+	fi
 else
-	report "internal links" "PASS  every playbook and reference resolves"
+	report "internal links" "PASS  local Markdown links resolve"
 fi
 
 parity() {

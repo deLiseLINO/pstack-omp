@@ -30,6 +30,10 @@ jobs:
           done
       - name: Port gate
         run: bash omp-port/check-port.sh
+      - name: Worktree audit regression
+        run: bash omp-port/test-worktree-audit.sh
+      - name: Prompt link regression
+        run: python3 omp-port/test-prompt-contracts.py
       - name: Install script test dependencies
         working-directory: plugins/pstack/skills/poteto-mode/scripts
         run: bun install --frozen-lockfile
