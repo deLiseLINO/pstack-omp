@@ -53,6 +53,10 @@ RECENT="$HOME/recent [one].worktree"
 UNRELATED="$HOME/unrelated worktree"
 REPO_RECENT="$HOME/repo session worktree"
 BROKEN="$HOME/broken worktree"
+ABSOLUTE="$FIXTURE/absolute:worktree"
+TEMPORARY="$TMPDIR/temp:worktree"
+git -C "$REPO" worktree add -q -b absolute "$ABSOLUTE" main
+git -C "$REPO" worktree add -q -b temporary "$TEMPORARY" main
 git -C "$REPO" update-ref refs/remotes/origin/open HEAD
 git -C "$REPO" worktree lock --reason 'keep this worktree' "$LOCKED"
 printf 'edit\n' >> "$DIRTY/tracked"
@@ -67,6 +71,11 @@ RECENT_BUCKET="$SESSIONS/-recent [one].worktree"
 mkdir -p "$RECENT_BUCKET" "$SESSIONS/-another-project"
 printf '{"cwd":"%s"}\n' "$RECENT" > "$RECENT_BUCKET/recent chat.jsonl"
 printf '{"cwd":"%s"}\n' "$UNRELATED" > "$SESSIONS/-another-project/unrelated.jsonl"
+# Absolute cwd encoding strips the leading slash and maps separators and colons.
+ABSOLUTE_BUCKET="$SESSIONS/--$(printf '%s' "${FIXTURE#/}" | tr '/' '-')-absolute-worktree--"
+mkdir -p "$ABSOLUTE_BUCKET" "$SESSIONS/-tmp-temp-worktree"
+printf '{"cwd":"%s"}\n' "$ABSOLUTE" > "$ABSOLUTE_BUCKET/absolute chat.jsonl"
+printf '{"cwd":"%s"}\n' "$TEMPORARY" > "$SESSIONS/-tmp-temp-worktree/temp chat.jsonl"
 EXPECTED_DATE=$(date '+%Y-%m-%d')
 
 cat > "$FIXTURE/bin/origin" <<'SH'
@@ -112,8 +121,8 @@ assert_output() {
 		/^# / { next }
 		$1 == "SIZE" { if (NF != 11) exit 1; header++; next }
 		{ if (NF != 11 || $1 == "") exit 1; rows++ }
-		END { if (header != 1 || rows != 9) exit 1 }
-	' "$OUTPUT" || fail "$LABEL: expected eleven aligned columns and nine candidate rows"
+		END { if (header != 1 || rows != 11) exit 1 }
+	' "$OUTPUT" || fail "$LABEL: expected eleven aligned columns and eleven candidate rows"
 	assert_cell "$OPEN" PR '#1/open'
 	assert_cell "$OPEN" REMOTE pushed
 	assert_cell "$OPEN" BUCKET hold-open-pr
@@ -140,6 +149,10 @@ assert_output() {
 	assert_cell "$RECENT" INSPECT ok
 	assert_cell "$RECENT" REMOTE no-remote
 	assert_cell "$RECENT" AGE 0d
+	assert_cell "$ABSOLUTE" LAST_CHAT "$EXPECTED_DATE"
+	assert_cell "$ABSOLUTE" BUCKET verify-recent-chat
+	assert_cell "$TEMPORARY" LAST_CHAT "$EXPECTED_DATE"
+	assert_cell "$TEMPORARY" BUCKET verify-recent-chat
 }
 run_audit() {
 	LABEL=$1
@@ -160,8 +173,20 @@ mkdir -p "$SESSIONS/-main repo"
 printf '{"cwd":"%s"}\n' "$REPO_RECENT" > "$SESSIONS/-main repo/repo chat.jsonl"
 REPO_CHAT_DATE=$EXPECTED_DATE
 REPO_CHAT_BUCKET=verify-recent-chat
-# Explicit session-root override must work without touching the default store.
-export PI_CODING_AGENT_SESSION_DIR="$SESSIONS"
+run_audit 'repo-bucket'
+# TMPDIR wins over HOME when both contain a cwd.
+LABEL=temp-priority
+OUTPUT="$FIXTURE/$LABEL.tsv"
+HOME="$TMPDIR" bash "$AUDIT" -b main "$REPO" > "$OUTPUT" || fail "$LABEL: audit exited unsuccessfully"
+assert_cell "$TEMPORARY" LAST_CHAT "$EXPECTED_DATE"
+assert_cell "$TEMPORARY" BUCKET verify-recent-chat
+# An explicit directory holds transcripts directly, without cwd buckets.
+DIRECT="$FIXTURE/direct sessions"
+mkdir -p "$DIRECT"
+for path in "$RECENT" "$REPO_RECENT" "$ABSOLUTE" "$TEMPORARY"; do
+	printf '{"cwd":"%s"}\n' "$path"
+done > "$DIRECT/direct chat.jsonl"
+export PI_CODING_AGENT_SESSION_DIR="$DIRECT"
 export PI_CODING_AGENT_DIR="$FIXTURE/unused-agent"
-run_audit 'repo-bucket-and-explicit-root'
+run_audit 'explicit-transcript-directory'
 printf 'worktree audit regression: PASS\n'

@@ -72,17 +72,23 @@ fi
 
 # omp keys each session tree by cwd. Scan this worktree's bucket and the repo's; walking every
 # bucket would scale with total session history.
-# For non-default omp profiles, set PI_CODING_AGENT_SESSION_DIR to the selected
-# profile's sessions root. This script does not guess the active profile.
-sessions="${PI_CODING_AGENT_SESSION_DIR:-${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions}"
+# Set PI_CODING_AGENT_DIR to a non-default profile root, or set
+# PI_CODING_AGENT_SESSION_DIR to a transcript directory used directly.
+sessions="${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions"
 temp_root=$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)
 bucket() {
 	local cwd encoded
+	if [ -n "${PI_CODING_AGENT_SESSION_DIR:-}" ]; then
+		printf '%s' "$PI_CODING_AGENT_SESSION_DIR"
+		return
+	fi
 	cwd=$(cd "$1" 2>/dev/null && pwd -P) || cwd="$1"
 	case "$cwd" in
-	"$HOME"|"$HOME"/*) encoded=$(printf '%s' "${cwd#"$HOME"}" | tr '/' '-') ;;
-	"$temp_root"/*) encoded="-tmp-$(printf '%s' "${cwd#"$temp_root"/}" | tr '/' '-')" ;;
-	*) encoded="--$(printf '%s' "$cwd" | tr '/' '-')--" ;;
+	"$temp_root") encoded="-tmp" ;;
+	"$temp_root"/*) encoded="-tmp-$(printf '%s' "${cwd#"$temp_root"/}" | tr '/\\:' '-')" ;;
+	"$HOME") encoded="-" ;;
+	"$HOME"/*) encoded=$(printf '%s' "${cwd#"$HOME"}" | tr '/\\:' '-') ;;
+	*) encoded="--$(printf '%s' "${cwd#/}" | tr '/\\:' '-')--" ;;
 	esac
 	printf '%s/%s' "$sessions" "$encoded"
 }

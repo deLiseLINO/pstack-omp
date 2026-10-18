@@ -12,10 +12,10 @@ Invoke when the user says "reflect" or "/reflect". Skip when the conversation is
 
 ## 1. Locate the active transcript
 
-Before fanning out, read `skill://omp-mechanics/references/session-store-on-omp.md`. Prefer `history://<id>` for an agent registered in this process. For the root conversation, resolve the session-store root and canonical-cwd bucket using that reference, including session-directory and profile overrides. Search only that bucket, never unrelated workspace chats.
+Before fanning out, read `skill://omp-mechanics/references/session-store-on-omp.md`. Prefer `history://<id>` for an agent registered in this process. Resolve this conversation's transcript directory using that reference. An explicit session-directory override is already the transcript directory; otherwise select the canonical-cwd bucket under the selected profile root. Search only that directory, never unrelated workspace chats.
 
 ```text
-Use glob on <resolved-session-root>/<encoded-cwd>/*.jsonl and the selected session's <session-stem>/**/*.jsonl sidecars. Resolve placeholders first, then inspect candidates with read.
+Use glob on <resolved-transcript-directory>/*.jsonl and the selected session's <session-stem>/**/*.jsonl sidecars. Resolve placeholders first, then inspect candidates with read.
 ```
 
 OMP stores flat `<timestamp>_<session-id>.jsonl` root sessions and `<session-stem>/<AgentId>.jsonl` child sidecars; nested child directories carry full dotted IDs. A current file starts with a fixed-width `type:title` slot, then a `type:session` header. Legacy files may start at the header. Neither is a user message. Match the opening user prompt against the first `type:message` entry whose `message.role` is `user`, reading its `message.content` text. If no candidate matches, pass a tight digest of this session instead. When a transcript has `reset_boundary` entries, review only the active context after the latest boundary unless the user explicitly asks to review earlier history.

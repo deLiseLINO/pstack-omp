@@ -29,7 +29,7 @@
  
  if [ -z "$base" ]; then
  	for cand in "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" origin/main origin/master; do
-@@ -50,30 +55,71 @@
+@@ -50,30 +55,77 @@
  # PR state by branch, fetched once as [{number, state, head}] with a lowercase
  # state. Origin when its CLI can read this repo's PRs, otherwise gh. Empty when
  # neither can.
@@ -55,17 +55,23 @@
 -transcripts="$HOME/.cursor/projects/$slug/agent-transcripts"
 +# omp keys each session tree by cwd. Scan this worktree's bucket and the repo's; walking every
 +# bucket would scale with total session history.
-+# For non-default omp profiles, set PI_CODING_AGENT_SESSION_DIR to the selected
-+# profile's sessions root. This script does not guess the active profile.
-+sessions="${PI_CODING_AGENT_SESSION_DIR:-${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions}"
++# Set PI_CODING_AGENT_DIR to a non-default profile root, or set
++# PI_CODING_AGENT_SESSION_DIR to a transcript directory used directly.
++sessions="${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/sessions"
 +temp_root=$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)
 +bucket() {
 +	local cwd encoded
++	if [ -n "${PI_CODING_AGENT_SESSION_DIR:-}" ]; then
++		printf '%s' "$PI_CODING_AGENT_SESSION_DIR"
++		return
++	fi
 +	cwd=$(cd "$1" 2>/dev/null && pwd -P) || cwd="$1"
 +	case "$cwd" in
-+	"$HOME"|"$HOME"/*) encoded=$(printf '%s' "${cwd#"$HOME"}" | tr '/' '-') ;;
-+	"$temp_root"/*) encoded="-tmp-$(printf '%s' "${cwd#"$temp_root"/}" | tr '/' '-')" ;;
-+	*) encoded="--$(printf '%s' "$cwd" | tr '/' '-')--" ;;
++	"$temp_root") encoded="-tmp" ;;
++	"$temp_root"/*) encoded="-tmp-$(printf '%s' "${cwd#"$temp_root"/}" | tr '/\\:' '-')" ;;
++	"$HOME") encoded="-" ;;
++	"$HOME"/*) encoded=$(printf '%s' "${cwd#"$HOME"}" | tr '/\\:' '-') ;;
++	*) encoded="--$(printf '%s' "${cwd#/}" | tr '/\\:' '-')--" ;;
 +	esac
 +	printf '%s/%s' "$sessions" "$encoded"
 +}
@@ -109,7 +115,7 @@
  	head_ts=$(git -C "$wt" log -1 --format='%ct' HEAD 2>/dev/null || echo 0)
  	age=$([ "$head_ts" -gt 0 ] 2>/dev/null && echo "$(( (now - head_ts) / 86400 ))d" || echo "?")
  
-@@ -82,8 +128,10 @@
+@@ -82,8 +134,10 @@
  	git merge-base --is-ancestor "$head" "$base" 2>/dev/null && merged=YES || merged=no
  
  	# Distinguish real WIP (tracked edits) from disposable untracked scratch.
@@ -122,7 +128,7 @@
  	elif printf '%s\n' "$porcelain" | grep -qv '^??'; then
  		dirty="wip:$(printf '%s\n' "$porcelain" | grep -cv '^??')"
  	else dirty="scratch:$(printf '%s\n' "$porcelain" | grep -c '^??')"; fi
-@@ -103,24 +151,37 @@
+@@ -103,24 +157,37 @@
  	# Most recent chat whose transcript operated in this worktree. Match path
  	# followed by "/" or a quote so glint-482 does not match glint-482-r37.
  	last="-"; last_ts=0
