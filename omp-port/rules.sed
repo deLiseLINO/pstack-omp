@@ -163,8 +163,6 @@ s#Substituting `generalPurpose` skips that read and drifts\.#Substituting `task`
 # so an unpinned read of skill://poteto-mode or a spawned poteto-agent still finds it.
 s|^## Non-negotiables$|## Non-negotiables\n\n**Read `skill://omp-mechanics` and `skill://pstack-omp` right after this file.** `pstack-omp` is the sole live task, vibe, eval, and runtime contract. `omp-mechanics` keeps only pstack-specific OMP deltas.|
 s#Reads the `poteto-mode` skill's `SKILL.md` in full before any work, including its inline Principles index\.#Reads the `poteto-mode` skill's `SKILL.md` in full before any work, including its inline Principles index, then `skill://omp-mechanics`.#
-# Cursor derives a mode skill's registry name from a display title; omp uses the slug.
-s#name: Poteto Mode#name: poteto-mode#
 
 ## 4. Cloud agents. Cursor runs them on its own VMs; omp runs isolated subagents on this machine.
 
@@ -180,8 +178,6 @@ s#the cloud agent's status in the Cursor dashboard#agent state from `read histor
 # Cursor's cloud PR tooling defaults to draft; omp's github tool defaults to ready.
 s#Cloud-agent PR tools default to draft, so set `draft: false` on every PR creation call\.#omp's `github` tool opens a ready PR from `op: "pr_create"` unless you pass `draft: true`, so leave that flag off.#
 s#Each live lane runs on its own cloud VM at the PR head\.#Each live lane runs in its own subagent at the PR head, asking for a private worktree with `isolated: true`.#
-s#Fan out N parallel cloud workers\.#Fan out N parallel workers.#
-s#N is total workers, not the cloud concurrency limit\.#N is total workers. `task.maxConcurrency` in `~/.omp/agent/config.yml` caps how many run at once.#
 # Cursor hands out a cloud-agent URL; omp's prior-run handles are internal URIs.
 s#cloud-agent URL#prior agent's `history://<id>` or `agent://<id>`#g
 # Cursor's local-versus-cloud split -> shared parent checkout versus a private worktree.
@@ -499,3 +495,8 @@ s#(the system prompt names the path)#(`history://<id>` is the documented surface
 # Unqualified force-push blocks the port's own rebase flow, which `pstackpolicy` explicitly permits
 # and `autopilot-stack` prescribes. Scope the pause the way the rest of the port scopes it.
 s#(force-push, delete production data, send external messages)#(force-push to a shared or trunk branch, delete production data, send external messages)#
+
+s#`/create-formal-verification-skill`#`/skill:create-formal-verification-skill`#g
+s#^pstack is built for Cursor, and it also installs in Claude Code.*$#This port runs in OMP. Install it with `/marketplace add negoro26/pstack-omp`, then `/marketplace install pstack@pstack-omp`. Read `skill://pstack-omp` for the live tool mapping.#
+s#^Other tools can read the skills, because they use the Agent Skills format.*$#The engineering workflows come from upstream. `skill://pstack-omp` maps worker execution and lifecycle to OMP; `skill://setup-pstack` configures OMP models, and the mode extension preserves the session pin.#
+ 
