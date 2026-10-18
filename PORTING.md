@@ -115,8 +115,8 @@ Everything below `pstack/skills` and `pstack/agents` is outside this port. The b
 `git archive` of exactly those two subtrees, so `.cursor-plugin/`, `docs/`, `assets/`, and
 `automations/` are structurally absent rather than carried and edited.
 
-- **Added** `skills/make-bot-ui/` (webhook-driven Grok Bot UI skill). Listed in the README skill
-  table and installed as a skill here.
+- **Excluded** `skills/make-bot-ui/` at the operator's request. Its Cursor webhook automation
+  has no OMP implementation. The build excludes the skill and removes its help entry.
 - **Deleted** `skills/poteto-mode/references/plan.md`. Canonical replaced the prose reference with an
   executable checker, `skills/poteto-mode/scripts/check-plan.mjs`. Both moves are reflected on disk
   in this port.
@@ -131,6 +131,13 @@ Everything below `pstack/skills` and `pstack/agents` is outside this port. The b
 
 `.cursor-plugin/plugin.json` is not vendored and never was in the current build: it sits outside the
 two subtrees `omp-port/lib.sh` archives, and omp never read it. Nothing in the tree parses it.
+
+The OMP build also omits upstream's root `plugin.json`. Its Agent Plugins schema
+selects OMP's strict skill loader, which rejects `disable-model-invocation` and
+other Cursor frontmatter fields used by pstack. The port registers its extensions
+through `package.json` and uses OMP-native skill discovery, which preserves hidden
+skills and exposes them through `skill://` and `/skill:`. Rebuilding removes a
+root manifest left by an earlier installation.
 
 ## Install, the two live shapes
 
@@ -151,7 +158,7 @@ The marketplace install is the user shape.
 
 That caches the plugin at `~/.omp/plugins/cache/plugins/pstack-omp___pstack___<version>` and links
 it at the same `~/.omp/plugins/node_modules/pstack` path. Verified on omp 18.1.13, 2026-09-07. The
-skills load, `setup-pstack` is among them and the rest hide, and both extensions register from
+skills load, `setup-pstack` is among them and the rest hide, and the mode pin registers from
 `package.json` `omp.extensions`, so `--poteto` injects the reminder in `-p` mode.
 
 The agents do not load from a marketplace root. omp scans a marketplace plugin's `agents/` directory
@@ -277,14 +284,9 @@ The injected reminder is a pointer, not the playbook. It tells the agent to read
 - **`swarm` / `arena` / `interrogate`.** One `task` call with a `tasks[]` batch,
   `task.maxConcurrency=100`, `isolated: true` per candidate, `outputSchema` for judged verdicts.
 - **Never-block.** Subagents run `approvalMode: yolo`, so a worker cannot stop to ask. **Nothing
-  here vetoes a malformed subagent result.** The plugin ships two extensions, `potetomode` and
-  `pstackpolicy`, and neither one registers a `session_stop`; `pstackpolicy` vetoes at `tool_call`
-  and only for the forge mutations, so a result that is merely wrong still gets through. What
-  pstack relies on for that is the root's own acceptance discipline: `skill://pstack-omp` requires
-  the root to read each result and accept or reject it, and a `judge`/`verifier` role is the
-  independent check on a worker's claim. That is the whole backstop for a malformed result. Landing
-  is a separate gate and it is enforced in process rather than in prose; see
-  [What omp can actually stop](#what-omp-can-actually-stop) below.
+  here vetoes a malformed subagent result.** The plugin ships the `potetomode` extension,
+  which does not register a `session_stop` veto. The root reads each worker result and
+  accepts or rejects it, and an independent reviewer checks the worker's claims.
   Returning `{"decision":"block"}` from `session_stop` is the one native veto contract, and
   `~/.omp/agent/extensions/proofgate/` implements it, dormant unless `$OMP_PROOF_FILE` is set, so
   treat the veto as absent unless you have verified that variable yourself. Its own `VERDICT.md`
@@ -361,30 +363,8 @@ thinking id for judgment work.
   that point. The same rule applies to every capability in this document. State the probe, not the
   version.
 
-### What omp can actually stop
+### Command policy removal
 
-The playbooks say "stop where the human's call begins", and until recently that was advice with
-nothing behind it. Three facts from `omp://approval-mode.md`, on omp 18.4.10, decide what an
-instruction is worth here:
-
-- `yolo` auto-approves the `read`, `write`, **and `exec`** tiers. A `gh pr merge` inside a bash
-  call is an `exec` call, so it runs with no prompt.
-- Subagents run headless with `tools.approvalMode: yolo`, and "the parent `task` approval is the
-  authorization boundary". Every pstack owner is a subagent, so the boundary is the spawn, not the
-  instruction.
-- A call that resolves to `prompt` is **rejected** in a headless subagent, because there is no one
-  to answer it. A backstop therefore has to *refuse*, not prompt.
-
-bash's built-in critical-pattern list covers `rm -rf /`, fork bombs, remote-fetch-then-execute,
-`/etc/passwd`, and host shutdown. **A merge is not on it.** So is not a force-push to trunk, a base
-retarget, a PR close, or a review comment.
-
-That is why the port now ships `plugins/pstack/extensions/pstackpolicy`, a second extension beside
-the mode pin. It registers `tool_call` and refuses the forge mutations outright unless the operator
-set `PSTACK_LANDING_GRANT=1`. The grant is an environment variable rather than a flag or a slash
-command because a flag an agent can pass is not a grant a human made, and an agent cannot set its
-own process environment. Refusals name the variable, so the operator is told exactly what to set.
-
-A force push to a **feature** branch stays allowed: that is the port's own rebase flow, and blocking
-it would fail every stack owner mid-rebase and make the extension unusable without a grant. A force
-push that names a trunk ref is refused, which is the case the playbooks keep escalating.
+The fork-specific command blocker was removed at the operator's request.
+The plugin no longer requires a landing environment variable or intercepts forge mutations.
+The mode pin remains. OMP's permissions and the user's approval rules still apply.

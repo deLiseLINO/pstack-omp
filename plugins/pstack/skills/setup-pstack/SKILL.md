@@ -59,3 +59,8 @@ Report the exact aliases and agent keys written, the selectors and effort suffix
 ### 7. Offer a verification skill (optional)
 
 Check whether the project has a way to drive the real app for proof. If not, offer once: "want a project-local verification skill, so agents can drive the app the way a user does and prove changes work? I can generate one." On yes, read `skill://create-verification-skill` in full and follow it. On no, move on without pushing.
+
+### 8. Offer a formal verification skill (optional)
+
+Check whether the project already has a skill that runs a model checker, proof, or another formal verifier against its code. If not, offer once: "want a formal verification skill, so agents can prove a key property holds in every case in scope, not only the cases tests reach? I can generate one." On yes, read `skill://create-formal-verification-skill` in full and follow it. On no, move on without pushing.
+

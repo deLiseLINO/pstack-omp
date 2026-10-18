@@ -522,25 +522,11 @@ else
 	report "owned" "PASS  $ownn owned path(s) present"
 fi
 
-# Upstream ships an Agent Plugins manifest so the plugin loads in any harness. The port copies it
-# through rather than rewriting it, because it is pure metadata: it names the plugin and says
-# nothing about how a task is spawned. Its absence is not visible anywhere else, so it is asserted
-# here. A manifest whose version disagrees with the pin means one of the two was written by hand.
-mfbad=""
-if [ ! -f plugin.json ]; then
-	mfbad="plugins/pstack/plugin.json missing; upstream's Agent Plugins manifest is not carried through"
-elif ! jq -e . >/dev/null 2>&1 <plugin.json; then
-	mfbad="plugins/pstack/plugin.json is not valid JSON"
-elif [ "$(jq -r '.version // empty' <plugin.json)" != "$(jq -r '.version' <package.json)" ]; then
-	mfbad="plugin.json version $(jq -r '.version // "none"' <plugin.json) disagrees with package.json $(jq -r '.version' <package.json)"
-elif [ "$(jq -r '.name // empty' <plugin.json)" != "pstack" ]; then
-	mfbad="plugin.json name is $(jq -r '.name // "none"' <plugin.json), not pstack"
-fi
-if [ -n "$mfbad" ]; then
+if [ -e plugin.json ]; then
 	report "plugin manifest" "FAIL"
-	while read -r m; do [ -n "$m" ] && violate "$m"; done <<<"$mfbad"
+	violate "plugins/pstack/plugin.json enables strict Agent Plugins discovery, which rejects the port's skill frontmatter"
 else
-	report "plugin manifest" "PASS  Agent Plugins manifest present and version-matched"
+	report "plugin manifest" "PASS  OMP-native discovery via package.json"
 fi
 
 # Owning a path makes an upstream edit to it vanish silently, so the count is surfaced on every gate
@@ -573,24 +559,21 @@ else
 	report "mechanics" "PASS  omp-mechanics installed and named in the reminder"
 fi
 
-# extensions/ sits outside SCOPE, so nothing else here would notice a control being unregistered.
-# That was verified by deleting the pstackpolicy entry from package.json: every test still passed
-# and the gate stayed green, because the tests import index.js directly and never read the
-# manifest. A backstop that can be switched off without anything noticing is not a backstop.
 unreg=""
-for ext in potetomode pstackpolicy; do
+if [ -e extensions/pstackpolicy/index.js ] || grep -qF 'pstackpolicy' package.json; then
+	unreg="operator-removed command policy must not be restored"$'\n'
+fi
+for ext in potetomode; do
 	grep -qF "./extensions/$ext/index.js" package.json 2>/dev/null ||
 		unreg="${unreg}package.json does not register extensions/$ext/index.js"$'\n'
 	[ -f "extensions/$ext/index.js" ] ||
 		unreg="${unreg}extensions/$ext/index.js is missing"$'\n'
 done
-grep -qF 'PSTACK_LANDING_GRANT' extensions/pstackpolicy/index.js 2>/dev/null ||
-	unreg="${unreg}extensions/pstackpolicy no longer names PSTACK_LANDING_GRANT"$'\n'
 if [ -n "$unreg" ]; then
 	report "extensions" "FAIL"
 	while read -r u; do [ -n "$u" ] && violate "$u"; done <<<"$unreg"
 else
-	report "extensions" "PASS  both extensions present and registered"
+	report "extensions" "PASS  mode pin present and registered"
 fi
 
 # The tree is build output. Rebuilding the pin has to reproduce it byte for byte outside the owned

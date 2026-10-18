@@ -4,6 +4,16 @@ Lauren Tan's pstack methodology, ported to omp. 56 skills, 23 playbooks, 24 prin
 leaves, the `poteto-mode` pin, and the `poteto-agent` and `comment-sicko` agents.
 53 skills are built from upstream. `omp-mechanics`, `pstack-omp`, and `setup-pstack` are port-owned.
 
+## Update to 0.15.27
+
+Adds `create-formal-verification-skill` and its optional setup offer. Carries the upstream
+`sharpen` changes. Removes obsolete name and cloud-worker rewrites that blocked synchronization.
+Keeps the local OMP packaging correction, so Cursor's generic manifest does not hide the
+OMP extensions.
+
+The incomplete `make-bot-ui` skill and its references are removed. Builds exclude it because
+its Cursor webhook automation has no OMP implementation. Future syncs must keep it excluded.
+
 ## Install
 
 ```
@@ -11,7 +21,7 @@ leaves, the `poteto-mode` pin, and the `poteto-agent` and `comment-sicko` agents
 /marketplace install pstack@pstack-omp
 ```
 
-That loads the 56 skills and both extensions, `potetomode` and `pstackpolicy`. The two agents are optional.
+That loads the 56 skills and the `potetomode` extension. The two agents are optional.
 On omp 18.1.13 a marketplace plugin's `agents/` directory is scanned only through the
 `claude-plugins` discovery provider, and enabling that provider also loads every Claude Code
 plugin cached under `~/.claude/plugins`. Link the agents into omp's native root instead:
@@ -33,22 +43,12 @@ Use these optional agents only when the live roster lists them; otherwise the ad
 
 Then `/poteto-mode on`, or `alt+shift+t`, or `omp -p --poteto '...'` for headless runs.
 
-## What the policy extension refuses
+## Policy removal
 
-`pstackpolicy` loads with the plugin and needs no configuration. It registers `tool_call` on `bash`
-and `eval`, and refuses the forge mutations the playbooks only ask for in prose: `gh pr merge`,
-merge and close through `gh api`, `gh pr close|reopen|delete`, `gh pr edit --base`, `gh pr review`,
-merge-when-ready, `gh repo delete`, `gh release create|delete|upload`,
-`gh secret|variable set|delete`, `gh workflow run --ref <trunk>`, the same forge calls made with
-`curl`, and `gt submit|rebase|restack`. Locally it refuses `git update-ref`, `git branch -D`,
-`git reset --hard` against a remote, and `git reflog expire --expire=now --all`. Any `git push`
-whose refspec lands on `main`, `master`, `trunk`, `develop`, or `release` is refused, forced or not;
-a force push to a feature branch stays allowed, because that is the port's own rebase flow.
-
-To land, set `PSTACK_LANDING_GRANT=1` in the environment omp starts from. It is an environment
-variable and not a flag or a slash command because a flag an agent can pass is not a grant you made.
-The refusal names the variable, so the agent tells you exactly what to set. `PORTING.md`'s
-"What omp can actually stop" carries the measurement behind the list.
+The fork-specific command blocker has been removed at the operator's request.
+No landing environment variable is required. The mode pin and engineering workflows remain.
+User approval rules and OMP's own permissions still apply.
+Future updates must preserve this removal. Do not restore the command blocker or its environment-variable requirement.
 
 ## What this plugin does not enforce
 

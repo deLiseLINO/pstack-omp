@@ -163,8 +163,6 @@ s#Substituting `generalPurpose` skips that read and drifts\.#Substituting `task`
 # so an unpinned read of skill://poteto-mode or a spawned poteto-agent still finds it.
 s|^## Non-negotiables$|## Non-negotiables\n\n**Read `skill://omp-mechanics` and `skill://pstack-omp` right after this file.** `pstack-omp` is the sole live task, vibe, eval, and runtime contract. `omp-mechanics` keeps only pstack-specific OMP deltas.|
 s#Reads the `poteto-mode` skill's `SKILL.md` in full before any work, including its inline Principles index\.#Reads the `poteto-mode` skill's `SKILL.md` in full before any work, including its inline Principles index, then `skill://omp-mechanics`.#
-# Cursor derives a mode skill's registry name from a display title; omp uses the slug.
-s#name: Poteto Mode#name: poteto-mode#
 
 ## 4. Cloud agents. Cursor runs them on its own VMs; omp runs isolated subagents on this machine.
 
@@ -180,8 +178,6 @@ s#the cloud agent's status in the Cursor dashboard#agent state from `read histor
 # Cursor's cloud PR tooling defaults to draft; omp's github tool defaults to ready.
 s#Cloud-agent PR tools default to draft, so set `draft: false` on every PR creation call\.#omp's `github` tool opens a ready PR from `op: "pr_create"` unless you pass `draft: true`, so leave that flag off.#
 s#Each live lane runs on its own cloud VM at the PR head\.#Each live lane runs in its own subagent at the PR head, asking for a private worktree with `isolated: true`.#
-s#Fan out N parallel cloud workers\.#Fan out N parallel workers.#
-s#N is total workers, not the cloud concurrency limit\.#N is total workers. `task.maxConcurrency` in `~/.omp/agent/config.yml` caps how many run at once.#
 # Cursor hands out a cloud-agent URL; omp's prior-run handles are internal URIs.
 s#cloud-agent URL#prior agent's `history://<id>` or `agent://<id>`#g
 # Cursor's local-versus-cloud split -> shared parent checkout versus a private worktree.
@@ -379,9 +375,6 @@ s#stop at the first one without a passing verdict, where both `PASS` and `PASS\+
 ## 10. Irreversible actions, and what the runtime actually enforces. Every replacement below
 ## exists because the original either contradicted another sentence in the same tree, named a
 ## surface omp does not have, or told an agent to do something the harness cannot stop. The
-## machine half is plugins/pstack/extensions/pstackpolicy, which refuses the forge mutations
-## unless the operator set PSTACK_LANDING_GRANT; prose alone cannot, because yolo auto-approves
-## the exec tier and every pstack owner is a headless subagent.
 
 # Landing is the one action the port routes a human toward and then never gated. The --auto branch
 # of this same step already carries "and the user asked"; the immediate branch did not, so an agent
@@ -430,10 +423,6 @@ s#push with `--force-with-lease` only after an `ls-remote` check, and set the PR
 # in the stack, so an unguarded retarget here reaches the whole chain.
 s#4\. \*\*Prepare only the bottom PR\.\*\* Fetch current trunk\.#4. **Prepare only the bottom PR**, and retarget only on the operator's explicit go: an operator approval to land a PR is not approval to rewrite the base of every PR above it. Fetch current trunk.#
 
-# The autonomy sentence contradicted the pause-list scope added in section 10, and the index routes
-# "full autopilot" straight here, so the trigger phrase the operator types is the phrase that clause
-# disqualified.
-s#The operator's full-autonomy grant plus the root's clean verdict is the merge authorization that babysitting alone never has\.#A full-autonomy grant authorises the owner to keep working without checking in; the root's clean verdict authorises a merge only inside that grant. Neither is implied by "go faster", and both still require the operator to have armed PSTACK_LANDING_GRANT for the merge itself.#
 
 # `trash` is macOS, so the step could not be followed on this host, and the sentence forbade the one
 # fallback that would work. Handled in zz-live-runtime-routing.patch instead, because that line is
@@ -496,6 +485,11 @@ s#(the system prompt names the path)#(`history://<id>` is the documented surface
 
 # The `how` skill has no modes. It branches on Step 2a Explore / Step 2b Direct Explain.
 
-# Unqualified force-push blocks the port's own rebase flow, which `pstackpolicy` explicitly permits
-# and `autopilot-stack` prescribes. Scope the pause the way the rest of the port scopes it.
+# Scope force-push approval to shared and trunk branches, not the feature-branch rebase flow.
 s#(force-push, delete production data, send external messages)#(force-push to a shared or trunk branch, delete production data, send external messages)#
+
+s#`/create-formal-verification-skill`#`/skill:create-formal-verification-skill`#g
+s#^pstack is built for Cursor, and it also installs in Claude Code.*$#This port runs in OMP. Install it with `/marketplace add negoro26/pstack-omp`, then `/marketplace install pstack@pstack-omp`. Read `skill://pstack-omp` for the live tool mapping.#
+s#^Other tools can read the skills, because they use the Agent Skills format.*$#The engineering workflows come from upstream. `skill://pstack-omp` maps worker execution and lifecycle to OMP; `skill://setup-pstack` configures OMP models, and the mode extension preserves the session pin.#
+ 
+/^\|.*make-bot-ui.*\|$/d

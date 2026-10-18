@@ -28,10 +28,6 @@ For `refactoring`, use `lsp` action `references` for a rename inventory and acti
 
 Resolve the installed `poteto-mode` skill directory for `scripts/check-plan.mjs`; do not assume a global package path. The control-surface line points to `skill://pstack-omp` and the live eval surface.
 
-## Make Bot UI
-
-Read `references/make-bot-ui-on-omp.md` before starting. The upstream Grok Bot webhook routine has no OMP equivalent, so do not create one.
-
 ## TypeScript
 
 OMP does not auto-attach a skill from `globs`. Read `skill://typescript-best-practices` before editing a `.ts` or `.tsx` file.
@@ -48,6 +44,5 @@ Before `recall`, `reflect`, `eval`, `session-pickup`, `show-me-your-work`, or `a
 
 - `poteto-mode` and `babysit` warn against Cursor's built-in `babysit` skill. OMP has no such skill, so the warning is inert.
 - `bugbot-triage` still applies to OMP's security reviewer and other review comments.
-- `make-bot-ui` names `api2.cursor.sh` and the Grok Bot routine panel. Neither maps to OMP.
 - `worktree-cleanup` used to name a macOS `trash` step this host does not have. It now moves each approved worktree somewhere recoverable, using `trash` where it exists and `mv` where it does not, and still forbids `rm -rf`. Nothing in it is platform-specific any more, so there is no step to skip.
 - `orchestrate` names Graphite (`gt`). Prefer the active forge client and do not require `gt`.
