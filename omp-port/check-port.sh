@@ -522,25 +522,11 @@ else
 	report "owned" "PASS  $ownn owned path(s) present"
 fi
 
-# Upstream ships an Agent Plugins manifest so the plugin loads in any harness. The port copies it
-# through rather than rewriting it, because it is pure metadata: it names the plugin and says
-# nothing about how a task is spawned. Its absence is not visible anywhere else, so it is asserted
-# here. A manifest whose version disagrees with the pin means one of the two was written by hand.
-mfbad=""
-if [ ! -f plugin.json ]; then
-	mfbad="plugins/pstack/plugin.json missing; upstream's Agent Plugins manifest is not carried through"
-elif ! jq -e . >/dev/null 2>&1 <plugin.json; then
-	mfbad="plugins/pstack/plugin.json is not valid JSON"
-elif [ "$(jq -r '.version // empty' <plugin.json)" != "$(jq -r '.version' <package.json)" ]; then
-	mfbad="plugin.json version $(jq -r '.version // "none"' <plugin.json) disagrees with package.json $(jq -r '.version' <package.json)"
-elif [ "$(jq -r '.name // empty' <plugin.json)" != "pstack" ]; then
-	mfbad="plugin.json name is $(jq -r '.name // "none"' <plugin.json), not pstack"
-fi
-if [ -n "$mfbad" ]; then
+if [ -e plugin.json ]; then
 	report "plugin manifest" "FAIL"
-	while read -r m; do [ -n "$m" ] && violate "$m"; done <<<"$mfbad"
+	violate "plugins/pstack/plugin.json enables strict Agent Plugins discovery, which rejects the port's skill frontmatter"
 else
-	report "plugin manifest" "PASS  Agent Plugins manifest present and version-matched"
+	report "plugin manifest" "PASS  OMP-native discovery via package.json"
 fi
 
 # Owning a path makes an upstream edit to it vanish silently, so the count is surfaced on every gate
